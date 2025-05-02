@@ -1,0 +1,65 @@
+:root {
+    /* Light theme colors */
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e9ecef;
+    
+    --text-primary: #212529;
+    --text-secondary: #495057;
+    --text-muted: #6c757d;
+    
+    --border-color: #dee2e6;
+    
+    --accent-primary: #7209b7;
+    --accent-secondary: #560bad;
+    --accent-tertiary: #480ca8;
+    
+    --success: #40916c;
+    --warning: #e9c46a;
+    --danger: #e63946;
+    --info: #457b9d;
+    
+    /* Sizing */
+    --border-radius-sm: 0.25rem;
+    --border-radius-md: 0.5rem;
+    --border-radius-lg: 1rem;
+    
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-xxl: 3rem;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .dark-theme {
+    /* Dark theme colors (similar to template) */
+    --bg-primary: #111111;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #222222;
+    
+    --text-primary: #f8f9fa;
+    --text-secondary: #e9ecef;
+    --text-muted: #adb5bd;
+    
+    --border-color: #2a2a2a;
+    
+    --accent-primary: #a020f0; /* Purple similar to template */
+    --accent-secondary: #8a2be2;
+    --accent-tertiary: #7b68ee;
+    
+    --success: #4cc9f0;
+    --warning: #f8961e;
+    --danger: #f94144;
+    --info: #90e0ef;
+    
+    /* Shadows for dark mode */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+  }

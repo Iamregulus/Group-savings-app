@@ -1,0 +1,78 @@
+import os
+from flask import Flask
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_mail import Mail
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize extensions
+db = SQLAlchemy()
+migrate = Migrate()
+jwt = JWTManager()
+mail = Mail()
+
+def create_app(test_config=None):
+    # Create and configure the app
+    app = Flask(__name__, instance_relative_config=True)
+    
+    # Configure the app
+    if test_config is None:
+        # Load the config from environment variables
+        app.config.from_mapping(
+            SECRET_KEY=os.environ.get('SECRET_KEY', 'dev'),
+            SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URI', 'sqlite:///group_savings.db'),
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+            JWT_SECRET_KEY=os.environ.get('JWT_SECRET_KEY', 'dev'),
+            JWT_ACCESS_TOKEN_EXPIRES=int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)),
+            MAIL_SERVER=os.environ.get('MAIL_SERVER'),
+            MAIL_PORT=int(os.environ.get('MAIL_PORT', 587)),
+            MAIL_USE_TLS=os.environ.get('MAIL_USE_TLS', 'True').lower() in ('true', '1', 't'),
+            MAIL_USERNAME=os.environ.get('MAIL_USERNAME'),
+            MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD'),
+            MAIL_DEFAULT_SENDER=os.environ.get('MAIL_DEFAULT_SENDER')
+        )
+    else:
+        # Load the test config if passed in
+        app.config.from_mapping(test_config)
+
+    # Ensure the instance folder exists
+    try:
+        os.makedirs(app.instance_path)
+    except OSError:
+        pass
+
+    # Initialize extensions with the app
+    db.init_app(app)
+    migrate.init_app(app, db)
+    jwt.init_app(app)
+    mail.init_app(app)
+    
+    # Enable CORS
+    CORS(app)
+
+    # Register blueprints
+    from api.auth import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    
+    from api.groups import groups_bp
+    app.register_blueprint(groups_bp, url_prefix='/api/groups')
+    
+    from api.users import users_bp
+    app.register_blueprint(users_bp, url_prefix='/api/users')
+    
+    from api.transactions import transactions_bp
+    app.register_blueprint(transactions_bp, url_prefix='/api/transactions')
+    
+    from api.notifications import notifications_bp
+    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+
+    @app.route('/')
+    def index():
+        return {"message": "Welcome to Group Savings API"}
+
+    return app 
