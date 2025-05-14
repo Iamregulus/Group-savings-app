@@ -52,8 +52,18 @@ def create_app(test_config=None):
     jwt.init_app(app)
     mail.init_app(app)
     
-    # Enable CORS
-    CORS(app)
+    # Enable CORS with specific configuration
+    CORS(app, resources={r"/*": {
+        "origins": [
+            "https://group-savings-app.vercel.app",
+            "https://group-savings-app-mu.vercel.app",
+            "http://localhost:5173",  # Vite default port
+            "http://localhost:3000",  # Alternate dev port
+            "*"  # Allow all origins as fallback
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"]
+    }})
 
     # Register blueprints
     from api.auth import auth_bp

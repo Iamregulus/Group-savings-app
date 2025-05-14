@@ -14,7 +14,9 @@ const api = axios.create({
     'Accept': 'application/json'
   },
   // Add CORS settings
-  withCredentials: false
+  withCredentials: false,
+  // Set a reasonable timeout
+  timeout: 10000
 });
 
 // Add a request interceptor to add auth token to requests
@@ -25,9 +27,9 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Log requests in development
+    // Log requests in development only to avoid console spam in production
     if (import.meta.env.DEV) {
-      console.log(`API ${config.method.toUpperCase()} Request:`, config.url, config.data || {});
+      console.log(`API ${config.method.toUpperCase()} Request:`, config.url);
     }
     
     return config;
@@ -44,18 +46,19 @@ let isRedirecting = false;
 // Add a response interceptor to handle errors globally
 api.interceptors.response.use(
   (response) => {
-    // Log successful responses in development
+    // Log successful responses in development only
     if (import.meta.env.DEV) {
-      console.log(`API Response (${response.status}):`, response.config.url, response.data);
+      console.log(`API Response (${response.status}):`, response.config.url);
     }
     return response.data;
   },
   (error) => {
-    // Log detailed error information
+    // Detailed error logging
     console.error('API Error:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
+      statusText: error.response?.statusText,
       data: error.response?.data,
       message: error.message
     });
@@ -80,7 +83,19 @@ api.interceptors.response.use(
     // Check for network errors specifically
     if (error.message && error.message.includes('Network Error')) {
       console.error('Network error detected. This could be due to CORS or server unavailability.');
-      // You could implement a retry mechanism here
+      
+      // Log additional diagnostic information
+      console.error('Network diagnostic info:', {
+        apiBaseURL: api.defaults.baseURL,
+        currentURL: window.location.href,
+        isProduction: isProduction,
+        browserInfo: navigator.userAgent
+      });
+    }
+    
+    // Handle timeout errors
+    if (error.code === 'ECONNABORTED') {
+      console.error('Request timeout. The server might be overloaded or unavailable.');
     }
     
     // Format and return error messages
@@ -92,9 +107,60 @@ api.interceptors.response.use(
     return Promise.reject({
       status: error.response?.status,
       message: errorMessage,
-      data: error.response?.data
+      data: error.response?.data,
+      isNetworkError: error.message && error.message.includes('Network Error'),
+      isTimeout: error.code === 'ECONNABORTED'
     });
   }
 );
+
+// Add a utility method to test connectivity
+api.testConnection = async () => {
+  try {
+    // Try the main endpoint first
+    const response = await axios.get('https://group-savings-app-production.up.railway.app', {
+      timeout: 5000,
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    // Then also check the API endpoint
+    try {
+      await axios.get('https://group-savings-app-production.up.railway.app/api', {
+        timeout: 5000,
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      return { 
+        success: true, 
+        status: response.status, 
+        data: response.data,
+        message: 'Both root and API endpoints are accessible'
+      };
+    } catch (apiError) {
+      return { 
+        success: false, 
+        rootSuccess: true,
+        apiSuccess: false,
+        error: 'API endpoint inaccessible: ' + apiError.message,
+        code: apiError.code,
+        response: apiError.response ? {
+          status: apiError.response.status,
+          statusText: apiError.response.statusText
+        } : null
+      };
+    }
+  } catch (rootError) {
+    return { 
+      success: false, 
+      rootSuccess: false,
+      error: 'Root endpoint inaccessible: ' + rootError.message,
+      code: rootError.code,
+      response: rootError.response ? {
+        status: rootError.response.status,
+        statusText: rootError.response.statusText
+      } : null
+    };
+  }
+};
 
 export default api;
