@@ -33,6 +33,7 @@ import Notifications from './pages/user/Notifications';
 import Sidebar from './components/common/Sidebar';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import NotificationDropdown from './components/common/NotificationDropdown';
+import NetworkStatusChecker from './components/common/NetworkStatusChecker';
 
 // Wrapper component to access theme context
 const AppContent = () => {
@@ -138,6 +139,7 @@ const AppContent = () => {
             
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </main>
       </div>
@@ -147,11 +149,13 @@ const AppContent = () => {
 
 function App() {
   return (
-    <HashRouter>
+    <HashRouter basename="/">
       <ThemeProvider>
         <AuthProvider>
           <NotificationProvider>
-            <AppContent />
+            <NetworkStatusChecker>
+              <AppContent />
+            </NetworkStatusChecker>
           </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>

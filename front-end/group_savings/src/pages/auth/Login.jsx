@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ErrorMessage from '../../components/common/ErrorMessage';
 
 // Simple version without external components to troubleshoot
 const Login = () => {
@@ -11,6 +12,7 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +29,10 @@ const Login = () => {
         ...errors,
         [name]: ''
       });
+    }
+    // Clear network error when user types
+    if (networkError) {
+      setNetworkError(false);
     }
   };
   
@@ -64,10 +70,16 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({
-        ...errors,
-        form: error.message || 'Login failed. Please check your credentials.'
-      });
+      
+      // Check if it's a network error
+      if (error.message && error.message.includes('Network Error')) {
+        setNetworkError(true);
+      } else {
+        setErrors({
+          ...errors,
+          form: error.message || 'Login failed. Please check your credentials.'
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +87,11 @@ const Login = () => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+  
+  const handleRetryConnection = () => {
+    setNetworkError(false);
+    handleSubmit({ preventDefault: () => {} });
   };
   
   // Updated styles based on the screenshot
@@ -138,18 +155,15 @@ const Login = () => {
           SaverCircle
         </h1>
         
-        {errors.form && (
-          <div style={{ 
-            background: 'rgba(220, 53, 69, 0.1)', 
-            color: '#ff6b6b', 
-            padding: '12px', 
-            borderRadius: '5px', 
-            marginBottom: '20px',
-            border: '1px solid rgba(220, 53, 69, 0.3)',
-            fontSize: '14px'
-          }}>
-            {errors.form}
-          </div>
+        {networkError && (
+          <ErrorMessage 
+            message="Network Error: Unable to connect to the server. Please check your internet connection or try again later." 
+            onRetry={handleRetryConnection}
+          />
+        )}
+        
+        {errors.form && !networkError && (
+          <ErrorMessage message={errors.form} />
         )}
         
         <form onSubmit={handleSubmit}>
