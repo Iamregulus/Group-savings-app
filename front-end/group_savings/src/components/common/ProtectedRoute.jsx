@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-// Set this to true to bypass authentication for development
-const BYPASS_AUTH = true;
+// Set this to false to enforce authentication
+const BYPASS_AUTH = false;
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { currentUser, loading, isAuthenticated } = useAuth();

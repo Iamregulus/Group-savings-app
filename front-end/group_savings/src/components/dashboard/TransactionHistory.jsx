@@ -1,9 +1,22 @@
 import React from 'react';
 import Card from '../common/Card';
 
-const TransactionHistory = ({ transactions, currency = '£' }) => {
+const TransactionHistory = ({ transactions = [], currency = '£' }) => {
+  // Normalize transactions to ensure we're working with an array
+  const transactionList = Array.isArray(transactions) 
+    ? transactions 
+    : (transactions?.transactions || []);
+
+  console.log("📊 TransactionHistory received:", transactionList);
+
   // Function to determine transaction type styles
   const getTransactionTypeStyles = (type) => {
+    if (!type) return {
+      color: 'text-gray-600',
+      icon: null,
+      sign: ''
+    };
+    
     switch (type.toLowerCase()) {
       case 'deposit':
       case 'contribution':
@@ -49,53 +62,109 @@ const TransactionHistory = ({ transactions, currency = '£' }) => {
     }
   };
 
+  // Helper to extract user name from various transaction formats
+  const getUserName = (transaction) => {
+    if (!transaction) return '-';
+    
+    // Directly access user object if available
+    if (transaction.user && (transaction.user.firstName || transaction.user.lastName)) {
+      return `${transaction.user.firstName || ''} ${transaction.user.lastName || ''}`.trim();
+    }
+    
+    // Try various user name formats
+    if (transaction.userName) return transaction.userName;
+    if (transaction.user_name) return transaction.user_name;
+    if (transaction.name) return transaction.name;
+    
+    return transaction.userEmail || transaction.email || 'Unknown User';
+  };
+
   // Format date
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+    if (!dateString) return '-';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return dateString || '-';
+    }
+  };
+
+  // Format amount
+  const formatAmount = (amount) => {
+    if (amount === undefined || amount === null) return '0.00';
+    
+    // Convert string to number if needed
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    if (isNaN(numAmount)) return '0.00';
+    
+    return numAmount.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
     });
   };
+
+  if (!transactionList.length) {
+    return (
+      <Card className="p-6 text-center">
+        <p className="text-gray-500">No transactions found</p>
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50">
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+            <tr className="bg-gray-50 dark:bg-gray-700">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {transactions.map((transaction, index) => {
-              const { color, icon, sign } = getTransactionTypeStyles(transaction.type);
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {transactionList.map((transaction, index) => {
+              // Extract transaction type from various formats
+              const type = transaction.transaction_type || transaction.type || 'Unknown';
+              const { color, icon, sign } = getTransactionTypeStyles(type);
+              
+              // Extract and format amount
+              const amount = parseFloat(transaction.amount) || 0;
+              
+              // Get description
+              const description = transaction.description || transaction.note || `Group ${type}`;
               
               return (
-                <tr key={transaction.id || index} className="hover:bg-gray-50">
+                <tr key={transaction.id || `transaction-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">{icon}</div>
                       <div className="ml-3">
-                        <p className={`text-sm font-medium ${color}`}>{transaction.type}</p>
+                        <p className={`text-sm font-medium ${color}`}>{type}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {transaction.description || `Transaction #${transaction.reference || index + 1}`}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                    {description}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {transaction.groupName || '-'}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                    {getUserName(transaction)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(transaction.date || transaction.createdAt || new Date())}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {formatDate(transaction.created_at || transaction.createdAt || transaction.date)}
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${color}`}>
-                    {sign}{currency}{transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {sign}{currency}{formatAmount(amount)}
                   </td>
                 </tr>
               );

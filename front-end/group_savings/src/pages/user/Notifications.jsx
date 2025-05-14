@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { notificationService } from '../../services/notificationService';
+import { useNotifications } from '../../context/NotificationContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import '../../styles/notifications.css';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 
 const Notifications = () => {
+  const { markAsRead, markAllAsRead, fetchUnreadCount } = useNotifications();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -40,10 +42,10 @@ const Notifications = () => {
     fetchNotifications();
   }, [pagination.offset, pagination.limit]);
 
-  // Mark a notification as read
+  // Handle marking a notification as read
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await notificationService.markAsRead(notificationId);
+      await markAsRead(notificationId);
       
       // Update local state
       setNotifications(prev => 
@@ -58,17 +60,20 @@ const Notifications = () => {
     }
   };
 
-  // Mark all notifications as read
+  // Handle marking all notifications as read
   const handleMarkAllAsRead = async () => {
     if (notifications.length === 0) return;
     
     try {
-      await notificationService.markAllAsRead();
+      await markAllAsRead();
       
       // Update local state
       setNotifications(prev => 
         prev.map(notification => ({ ...notification, isRead: true }))
       );
+      
+      // Refresh unread count in the context
+      fetchUnreadCount();
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
@@ -121,7 +126,7 @@ const Notifications = () => {
       case 'withdrawal_rejected':
         return 'Withdrawal Rejected';
       default:
-        return type.replace('_', ' ');
+        return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
   };
 
@@ -130,7 +135,7 @@ const Notifications = () => {
       <div className="notifications-page-header">
         <h1>Notifications</h1>
         <Button 
-          variant="outline" 
+          variant="primary" 
           onClick={handleMarkAllAsRead}
           disabled={notifications.length === 0 || notifications.every(n => n.isRead)}
         >

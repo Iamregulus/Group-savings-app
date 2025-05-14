@@ -8,6 +8,7 @@ import './styles/layout.css';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { useTheme } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -19,17 +20,19 @@ import ResetPassword from './pages/auth/ResetPassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import WithdrawalRequests from './pages/admin/WithdrawalRequests';
 import MemberManagement from './pages/admin/MemberManagement';
+import GroupWithdrawals from './pages/admin/GroupWithdrawals';
 
 // User Pages
 import Dashboard from './pages/user/Dashboard';
 import GroupDetail from './pages/user/GroupDetail';
 import CreateGroup from './pages/user/CreateGroup';
+import JoinGroup from './pages/user/JoinGroup';
 import Notifications from './pages/user/Notifications';
 
 // Common Components
-import Navbar from './components/common/Navbar';
 import Sidebar from './components/common/Sidebar';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import NotificationDropdown from './components/common/NotificationDropdown';
 
 // Wrapper component to access theme context
 const AppContent = () => {
@@ -41,10 +44,12 @@ const AppContent = () => {
   };
 
   return (
-    <div className={`app ${darkMode ? 'dark-mode' : 'light-mode'}`}>
-      <Sidebar className={isMobileSidebarOpen ? 'open' : ''} />
-      <div className="content-wrapper">
-        <Navbar toggleSidebar={toggleMobileSidebar} />
+    <div className={`app ${darkMode ? 'dark-mode' : 'light-mode'}`} style={{ display: 'flex', width: '100%', height: '100vh', overflow: 'hidden' }}>
+      <Sidebar isOpen={isMobileSidebarOpen} />
+      <div className="content-wrapper" style={{ flex: 1, marginLeft: 0 }}>
+        <div className="notification-bar flex justify-end px-4 py-2">
+          <NotificationDropdown />
+        </div>
         <main className="main-content">
           <Routes>
             {/* Public routes */}
@@ -105,10 +110,28 @@ const AppContent = () => {
               } 
             />
             <Route 
+              path="/join-group" 
+              element={
+                <ProtectedRoute>
+                  <JoinGroup />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/notifications" 
               element={
                 <ProtectedRoute>
                   <Notifications />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Group Admin Routes */}
+            <Route 
+              path="/admin/withdrawals/:groupId" 
+              element={
+                <ProtectedRoute>
+                  <GroupWithdrawals />
                 </ProtectedRoute>
               } 
             />
@@ -127,7 +150,9 @@ function App() {
     <HashRouter>
       <ThemeProvider>
         <AuthProvider>
-          <AppContent />
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>
     </HashRouter>

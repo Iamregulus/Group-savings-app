@@ -1,55 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { notificationService } from '../../services/notificationService';
+import { useNotifications } from '../../context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const NotificationDropdown = () => {
+  const { unreadCount, markAsRead, fetchUnreadCount, isAuthenticated } = useNotifications();
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
   
   // Load notifications when dropdown is opened
   const fetchNotifications = async () => {
+    if (!isAuthenticated) return;
+    
     try {
       setIsLoading(true);
-      const response = await notificationService.getNotifications({ limit: 10 });
-      setNotifications(response.data.notifications);
-      setUnreadCount(response.data.meta.unreadCount);
+      setError(null);
+      const response = await notificationService.getNotifications({ limit: 5 });
+      setNotifications(response.data.notifications || []);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setError('Failed to load notifications');
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Initial load and also set up an interval to refresh notifications
-  useEffect(() => {
-    // Get the unread count when component mounts
-    const getUnreadCount = async () => {
-      try {
-        const response = await notificationService.getNotifications({ limit: 1, unreadOnly: true });
-        setUnreadCount(response.data.meta.unreadCount);
-      } catch (error) {
-        console.error('Error fetching notification count:', error);
-      }
-    };
-    
-    getUnreadCount();
-    
-    // Set up refresh interval (every 30 seconds)
-    const interval = setInterval(getUnreadCount, 30000);
-    
-    // Clean up the interval on unmount
-    return () => clearInterval(interval);
-  }, []);
-  
   // Fetch notifications when the dropdown is opened
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isAuthenticated) {
       fetchNotifications();
     }
-  }, [isOpen]);
+  }, [isOpen, isAuthenticated]);
   
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -67,8 +53,10 @@ const NotificationDropdown = () => {
   
   // Mark a notification as read
   const handleMarkAsRead = async (notificationId) => {
+    if (!isAuthenticated) return;
+    
     try {
-      await notificationService.markAsRead(notificationId);
+      await markAsRead(notificationId);
       
       // Update local state
       setNotifications(prev => 
@@ -78,30 +66,8 @@ const NotificationDropdown = () => {
             : notification
         )
       );
-      
-      // Decrease unread count
-      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error marking notification as read:', error);
-    }
-  };
-  
-  // Mark all notifications as read
-  const handleMarkAllAsRead = async () => {
-    if (notifications.length === 0) return;
-    
-    try {
-      await notificationService.markAllAsRead();
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => ({ ...notification, isRead: true }))
-      );
-      
-      // Reset unread count
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
     }
   };
   
@@ -109,6 +75,14 @@ const NotificationDropdown = () => {
   const toggleDropdown = () => {
     setIsOpen(!isOpen);
   };
+
+  // View all notifications link
+  const viewAllNotifications = () => {
+    setIsOpen(false);
+  };
+  
+  // If not authenticated, don't render anything
+  if (!isAuthenticated) return null;
   
   return (
     <div className="notification-dropdown" ref={dropdownRef}>
@@ -128,8 +102,8 @@ const NotificationDropdown = () => {
           strokeLinecap="round" 
           strokeLinejoin="round"
         >
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-          <circle cx="12" cy="12" r="3" />
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
         {unreadCount > 0 && (
           <span className="notification-badge">{unreadCount}</span>
@@ -140,19 +114,13 @@ const NotificationDropdown = () => {
         <div className="notification-menu">
           <div className="notification-header">
             <h3>Notifications</h3>
-            {unreadCount > 0 && (
-              <button 
-                className="mark-all-read"
-                onClick={handleMarkAllAsRead}
-              >
-                Mark all as read
-              </button>
-            )}
           </div>
           
           <div className="notification-list">
             {isLoading ? (
               <div className="notification-loading">Loading notifications...</div>
+            ) : error ? (
+              <div className="notification-error">{error}</div>
             ) : notifications.length > 0 ? (
               notifications.map(notification => (
                 <div 
@@ -174,6 +142,12 @@ const NotificationDropdown = () => {
             ) : (
               <div className="no-notifications">No notifications</div>
             )}
+          </div>
+          
+          <div className="notification-footer">
+            <Link to="/notifications" onClick={viewAllNotifications}>
+              View all notifications
+            </Link>
           </div>
         </div>
       )}

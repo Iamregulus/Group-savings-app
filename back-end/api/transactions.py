@@ -174,4 +174,77 @@ def export_transactions():
                 'type': transaction_type
             }
         }
+    }), 200
+
+# Add new endpoint for group transactions
+@transactions_bp.route('/group/<group_id>', methods=['GET'])
+@jwt_required()
+def get_group_transactions(group_id):
+    current_user_id = get_jwt_identity()
+    
+    # Check if group exists
+    group = Group.query.get(group_id)
+    if not group:
+        return jsonify({'message': 'Group not found'}), 404
+    
+    # Check if user is a member of the group
+    membership = GroupMember.query.filter_by(
+        user_id=current_user_id,
+        group_id=group_id,
+        is_active=True
+    ).first()
+    
+    if not membership:
+        return jsonify({'message': 'You do not have permission to view this group\'s transactions'}), 403
+    
+    # Get request parameters
+    limit = request.args.get('limit', 10, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    transaction_type = request.args.get('type')
+    start_date = request.args.get('startDate')
+    end_date = request.args.get('endDate')
+    user_id = request.args.get('userId')
+    
+    # Build query
+    query = Transaction.query.filter_by(group_id=group_id)
+    
+    # Apply filters
+    if transaction_type:
+        query = query.filter_by(transaction_type=transaction_type)
+    if start_date:
+        query = query.filter(Transaction.created_at >= start_date)
+    if end_date:
+        query = query.filter(Transaction.created_at <= end_date)
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    
+    # Get total count
+    total = query.count()
+    
+    # Apply pagination
+    transactions = query.order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
+    
+    # Prepare response
+    transaction_list = []
+    for transaction in transactions:
+        transaction_dict = transaction.to_dict()
+        
+        # Add user info
+        user = User.query.get(transaction.user_id)
+        transaction_dict['user'] = {
+            'id': user.id,
+            'firstName': user.first_name,
+            'lastName': user.last_name,
+            'email': user.email
+        } if user else None
+        
+        transaction_list.append(transaction_dict)
+    
+    return jsonify({
+        'transactions': transaction_list,
+        'meta': {
+            'total': total,
+            'offset': offset,
+            'limit': limit
+        }
     }), 200 

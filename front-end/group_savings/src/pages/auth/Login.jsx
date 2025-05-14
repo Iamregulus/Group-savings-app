@@ -248,24 +248,20 @@ const Login = () => {
           
           <div style={{ textAlign: 'center', marginTop: '24px' }}>
             <p style={{ color: '#fff', fontSize: '14px' }}>
-              Don't have an account? <Link to="/signup" style={{ color: '#4ecdc4', fontWeight: '600', textDecoration: 'none' }}>Sign up</Link>
+              Don't have an account? <Link to="/signup" style={{ color: '#4ecdc4', textDecoration: 'none' }}>Sign up</Link>
             </p>
           </div>
           
-          {/* Demo account information */}
-          <div style={{ 
-            marginTop: '32px', 
-            background: 'rgba(78, 205, 196, 0.1)', 
-            color: '#fff', 
-            padding: '12px', 
-            borderRadius: '5px', 
-            border: '1px solid rgba(78, 205, 196, 0.2)',
-            fontSize: '12px'
+          <div style={{
+            marginTop: '30px',
+            padding: '15px',
+            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+            border: '1px solid rgba(78, 205, 196, 0.3)',
+            borderRadius: '5px'
           }}>
-            <div style={{ fontWeight: '600', marginBottom: '4px', color: '#4ecdc4' }}>Demo Accounts:</div>
-            <div>Admin: admin@example.com</div>
-            <div>User: user@example.com</div>
-            <div>Password: password (for both)</div>
+            <h4 style={{ color: '#4ecdc4', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>Demo Accounts:</h4>
+            <p style={{ margin: '5px 0', color: '#ddd', fontSize: '13px' }}>Test User: test@example.com</p>
+            <p style={{ margin: '5px 0', color: '#ddd', fontSize: '13px' }}>Password: password123</p>
           </div>
         </form>
       </div>

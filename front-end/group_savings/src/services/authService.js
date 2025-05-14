@@ -22,7 +22,7 @@ export const authService = {
   // Get current user profile
   async getCurrentUser() {
     try {
-      return await api.get('/auth/me');
+      return await api.get('/auth/profile');
     } catch (error) {
       throw error;
     }
