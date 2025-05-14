@@ -8,6 +8,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Loader from '../../components/common/Loader';
+import Alert from '../../components/common/Alert';
 
 const JoinGroup = () => {
   const navigate = useNavigate();
@@ -21,18 +22,31 @@ const JoinGroup = () => {
   const [joining, setJoining] = useState(false);
   const [joiningGroupId, setJoiningGroupId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const fetchAvailableGroups = async () => {
     try {
       setRefreshing(true);
+      setError(null);
+      
+      console.log('Fetching available groups...');
       const groups = await groupService.getAvailableGroups();
+      
+      console.log('Available groups:', groups);
       setAvailableGroups(groups);
       setFilteredGroups(groups);
+      
+      if (groups.length === 0) {
+        console.log('No available groups found');
+      }
+      
       setRefreshing(false);
     } catch (error) {
       console.error('Error fetching available groups:', error);
-      setError('Failed to load available groups. Please try again later.');
+      setError(error.message || 'Failed to load available groups. Please try again later.');
       setRefreshing(false);
+      setAvailableGroups([]);
+      setFilteredGroups([]);
     }
   };
 
@@ -57,11 +71,29 @@ const JoinGroup = () => {
     try {
       setJoiningGroupId(groupId);
       setJoining(true);
+      setError(null);
+      
+      const selectedGroup = availableGroups.find(g => g.id === groupId);
+      const groupName = selectedGroup ? selectedGroup.name : 'group';
+      
+      console.log(`Joining group ${groupId}...`);
       await groupService.joinGroup(groupId, {});
-      navigate(`/groups/${groupId}`);
+      
+      // Show success message and update available groups list
+      setSuccessMessage(`Successfully joined "${groupName}"! Redirecting...`);
+      
+      // Remove the joined group from the list
+      const updatedGroups = availableGroups.filter(g => g.id !== groupId);
+      setAvailableGroups(updatedGroups);
+      setFilteredGroups(updatedGroups);
+      
+      // Wait a moment before navigating to let the user see the success message
+      setTimeout(() => {
+        navigate(`/groups/${groupId}`, { state: { groupJoined: true } });
+      }, 1500);
     } catch (error) {
       console.error('Error joining group:', error);
-      setError(error.response?.data?.message || 'Failed to join group. Please try again.');
+      setError(error.message || 'Failed to join group. Please try again.');
       setJoining(false);
       setJoiningGroupId(null);
     }
@@ -75,11 +107,21 @@ const JoinGroup = () => {
 
     try {
       setJoining(true);
+      setError(null);
+      
+      console.log(`Joining with invite code ${inviteCode.trim()}...`);
       const response = await groupService.joinGroupByCode(inviteCode.trim());
-      navigate(`/groups/${response.groupId}`);
+      
+      // Show success message
+      setSuccessMessage(`Successfully joined group! Redirecting...`);
+      
+      // Wait a moment before navigating to let the user see the success message
+      setTimeout(() => {
+        navigate(`/groups/${response.groupId}`, { state: { groupJoined: true } });
+      }, 1500);
     } catch (error) {
       console.error('Error joining by invite code:', error);
-      setError(error.response?.data?.message || 'Invalid invite code or the group no longer exists.');
+      setError(error.message || 'Invalid invite code or the group no longer exists.');
       setJoining(false);
     }
   };
@@ -98,9 +140,20 @@ const JoinGroup = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
-          {error}
-        </div>
+        <Alert 
+          type="error"
+          message={error}
+          className="mb-6"
+          onClose={() => setError(null)}
+        />
+      )}
+      
+      {successMessage && (
+        <Alert 
+          type="success"
+          message={successMessage}
+          className="mb-6"
+        />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
@@ -113,11 +166,13 @@ const JoinGroup = () => {
               placeholder="Enter invite code"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
+              disabled={joining}
             />
             <Button 
               onClick={handleJoinByInvite}
-              disabled={joining}
+              disabled={joining || !inviteCode.trim()}
               fullWidth
+              variant="primary"
             >
               {joining ? 'Joining...' : 'Join Group'}
             </Button>
@@ -132,9 +187,24 @@ const JoinGroup = () => {
                 variant="text" 
                 onClick={handleRefresh} 
                 disabled={refreshing}
-                className="text-primary"
+                className="text-primary flex items-center"
               >
-                {refreshing ? 'Refreshing...' : 'Refresh'}
+                {refreshing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </>
+                )}
               </Button>
             </div>
             
@@ -145,11 +215,24 @@ const JoinGroup = () => {
               className="mb-4"
             />
 
-            {filteredGroups.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No matching groups found.</p>
+            {refreshing && (
+              <div className="flex justify-center py-4">
+                <Loader size="medium" />
               </div>
-            ) : (
+            )}
+
+            {!refreshing && filteredGroups.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No public groups available to join.</p>
+                <div className="flex justify-center">
+                  <Button onClick={() => navigate('/create-group')} variant="primary">
+                    Create Your Own Group
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {!refreshing && filteredGroups.length > 0 && (
               <div className="space-y-4">
                 {filteredGroups.map(group => (
                   <Card key={group.id} className="p-4 hover:shadow-md transition-shadow duration-200">
@@ -187,7 +270,7 @@ const JoinGroup = () => {
                       <Button 
                         onClick={() => handleJoinPublicGroup(group.id)}
                         disabled={joining}
-                        variant="outline"
+                        variant="primary"
                         size="small"
                       >
                         {joining && joiningGroupId === group.id ? 'Joining...' : 'Join'}
@@ -201,9 +284,9 @@ const JoinGroup = () => {
         </div>
       </div>
 
-      <div className="text-center p-8 bg-gray-50 rounded-lg">
-        <p className="text-gray-600 mb-4">Can't find what you're looking for?</p>
-        <Button onClick={() => navigate('/create-group')} variant="outline">Create Your Own Group</Button>
+      <div className="text-center p-8 bg-gray-50 rounded-lg dark:bg-gray-800">
+        <p className="text-gray-600 dark:text-gray-300 mb-4">Can't find what you're looking for?</p>
+        <Button onClick={() => navigate('/create-group')} variant="primary">Create Your Own Group</Button>
       </div>
     </div>
   );

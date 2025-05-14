@@ -4,10 +4,12 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         primary: 'var(--accent-primary)',
+        'primary-light': 'var(--accent-primary-light)',
         secondary: 'var(--accent-secondary)',
         tertiary: 'var(--accent-tertiary)',
         success: 'var(--success)',
@@ -22,6 +24,7 @@ export default {
       },
       textColor: {
         primary: 'var(--text-primary)',
+        'primary-light': 'var(--text-primary-light)',
         secondary: 'var(--text-secondary)',
         muted: 'var(--text-muted)',
       },

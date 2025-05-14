@@ -8,10 +8,10 @@ export const notificationService = {
       
       if (params.limit) queryParams.append('limit', params.limit);
       if (params.offset) queryParams.append('offset', params.offset);
-      if (params.unreadOnly) queryParams.append('unread', true);
+      if (params.unreadOnly) queryParams.append('unread', 'true');
       
       const queryString = queryParams.toString();
-      const endpoint = `/notifications${queryString ? `?${queryString}` : ''}`;
+      const endpoint = `/notifications/${queryString ? `?${queryString}` : ''}`;
       
       return await api.get(endpoint);
     } catch (error) {
@@ -43,6 +43,10 @@ export const notificationService = {
       const response = await this.getNotifications({ limit: 1, unreadOnly: true });
       return response.data.meta.unreadCount || 0;
     } catch (error) {
+      // If we get an authentication error, return 0 instead of propagating the error
+      if (error.status === 401) {
+        return 0;
+      }
       throw error;
     }
   }

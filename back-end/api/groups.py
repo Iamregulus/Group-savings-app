@@ -22,11 +22,22 @@ def get_available_groups():
     user_id = get_jwt_identity()
     
     # Get all public groups
+    print(f"Looking for public groups for user {user_id}")
     public_groups = Group.query.filter_by(is_public=True, status='active').all()
+    print(f"Found {len(public_groups)} public groups")
+    
+    # Print details for debugging
+    for group in public_groups:
+        print(f"Group: {group.id}, {group.name}, Public: {group.is_public}, Status: {group.status}, Creator: {group.creator_id}")
     
     # Filter out groups the user is already a member of
-    user_group_ids = [member.group_id for member in GroupMember.query.filter_by(user_id=user_id).all()]
+    user_memberships = GroupMember.query.filter_by(user_id=user_id).all()
+    user_group_ids = [member.group_id for member in user_memberships]
+    
+    print(f"User {user_id} is already a member of groups: {user_group_ids}")
+    
     available_groups = [group for group in public_groups if group.id not in user_group_ids]
+    print(f"Filtering to {len(available_groups)} available groups")
     
     return jsonify([group.to_dict() for group in available_groups]), 200
 
@@ -45,6 +56,54 @@ def get_user_groups():
         if group:
             group_dict = group.to_dict()
             group_dict['role'] = membership.role  # Add user's role in the group
+            
+            # Calculate total contributions and withdrawals for the group
+            total_contributions = Transaction.query.filter_by(
+                group_id=group.id,
+                transaction_type='contribution',
+                status='completed'
+            ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+            
+            total_withdrawals = Transaction.query.filter_by(
+                group_id=group.id,
+                transaction_type='withdrawal',
+                status='completed'
+            ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+            
+            # Calculate user's contributions and withdrawals
+            user_contributions = Transaction.query.filter_by(
+                user_id=user_id,
+                group_id=group.id,
+                transaction_type='contribution',
+                status='completed'
+            ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+            
+            user_withdrawals = Transaction.query.filter_by(
+                user_id=user_id,
+                group_id=group.id,
+                transaction_type='withdrawal',
+                status='completed'
+            ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+            
+            # Get member count
+            member_count = GroupMember.query.filter_by(group_id=group.id, is_active=True).count()
+            
+            # Add additional information to the group dictionary
+            group_dict['totalSaved'] = total_contributions
+            group_dict['totalWithdrawals'] = total_withdrawals
+            group_dict['availableBalance'] = total_contributions - total_withdrawals
+            group_dict['userSavings'] = user_contributions - user_withdrawals
+            group_dict['memberCount'] = member_count
+            
+            # Check for pending withdrawals if user is an admin
+            if membership.role == 'admin':
+                pending_withdrawals = Transaction.query.filter_by(
+                    group_id=group.id,
+                    transaction_type='withdrawal',
+                    status='pending'
+                ).count()
+                group_dict['pendingWithdrawals'] = pending_withdrawals
+            
             groups.append(group_dict)
     
     return jsonify(groups), 200
@@ -70,6 +129,76 @@ def get_group(group_id):
     # If user is a member, add their role
     if membership:
         group_dict['userRole'] = membership.role
+        group_dict['isUserAdmin'] = membership.role == 'admin'
+    
+    # Calculate total contributions and withdrawals
+    total_contributions = Transaction.query.filter_by(
+        group_id=group_id,
+        transaction_type='contribution',
+        status='completed'
+    ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+    
+    total_withdrawals = Transaction.query.filter_by(
+        group_id=group_id,
+        transaction_type='withdrawal',
+        status='completed'
+    ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+    
+    # Calculate user's personal contributions and withdrawals
+    user_contributions = 0
+    user_withdrawals = 0
+    if membership:
+        user_contributions = Transaction.query.filter_by(
+            user_id=user_id,
+            group_id=group_id,
+            transaction_type='contribution',
+            status='completed'
+        ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+        
+        user_withdrawals = Transaction.query.filter_by(
+            user_id=user_id,
+            group_id=group_id,
+            transaction_type='withdrawal',
+            status='completed'
+        ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+    
+    # Get member count
+    member_count = GroupMember.query.filter_by(group_id=group_id, is_active=True).count()
+    
+    # Calculate current balance and add to group data
+    current_balance = total_contributions - total_withdrawals
+    user_balance = user_contributions - user_withdrawals
+    
+    group_dict['totalSaved'] = total_contributions
+    group_dict['totalWithdrawals'] = total_withdrawals
+    group_dict['availableBalance'] = current_balance
+    group_dict['userSavings'] = user_balance
+    group_dict['memberCount'] = member_count
+    
+    # Get pending withdrawal requests count if user is admin
+    if membership and membership.role == 'admin':
+        pending_withdrawals = Transaction.query.filter_by(
+            group_id=group_id,
+            transaction_type='withdrawal',
+            status='pending'
+        ).count()
+        group_dict['pendingWithdrawals'] = pending_withdrawals
+    
+    # Get group members if user is a member
+    if membership:
+        members = []
+        group_members = GroupMember.query.filter_by(group_id=group_id, is_active=True).all()
+        for member in group_members:
+            user = User.query.get(member.user_id)
+            if user:
+                members.append({
+                    'id': user.id,
+                    'name': f"{user.first_name} {user.last_name}",
+                    'email': user.email,
+                    'role': member.role,
+                    'joinedAt': member.joined_at.isoformat() if member.joined_at else None
+                })
+        group_dict['members'] = members
     
     return jsonify(group_dict), 200
 
@@ -86,6 +215,7 @@ def create_group():
         return jsonify({'message': 'User not found'}), 404
     
     data = request.get_json()
+    print(f"Received data: {data}")
     if not data:
         return jsonify({'message': 'Invalid or missing JSON data'}), 400
     
@@ -93,10 +223,12 @@ def create_group():
     required_fields = ['name', 'targetAmount', 'contributionAmount', 'contributionFrequency', 'maxMembers']
     for field in required_fields:
         if field not in data:
+            print(f"Missing required field: {field}")
             return jsonify({'message': f'Missing required field: {field}'}), 400
     
     # Create new group
     try:
+        print(f"Creating group with: {data}")
         group = Group(
             name=data['name'],
             description=data.get('description', ''),
@@ -114,21 +246,29 @@ def create_group():
             group.join_code = generate_join_code()
         
         # Save to database
+        print("About to add group to db.session")
         db.session.add(group)
+        print("About to commit group to database")
         db.session.commit()
+        print("Group committed successfully, ID:", group.id)
         
         # Add the creator as an admin member
+        print("Creating admin membership for user:", user_id)
         member = GroupMember(
             group_id=group.id,
             user_id=user_id,
             role='admin'
         )
         
+        print("About to add member to db.session")
         db.session.add(member)
+        print("About to commit member to database")
         db.session.commit()
+        print("Member committed successfully")
         
         # Return group data with proper id
         group_data = group.to_dict()
+        print("Final group data:", group_data)
         
         return jsonify({
             'message': 'Group created successfully',
@@ -138,7 +278,22 @@ def create_group():
     except Exception as e:
         db.session.rollback()
         print(f"Error creating group: {str(e)}")
-        return jsonify({'message': 'Failed to create group', 'error': str(e)}), 422
+        print(f"Exception type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        
+        # Print additional debug info
+        print("User ID:", user_id)
+        print("Request data:", data)
+        
+        if hasattr(e, '__dict__'):
+            print("Exception attributes:", {k: v for k, v in e.__dict__.items() if not k.startswith('_')})
+        
+        return jsonify({
+            'message': 'Failed to create group', 
+            'error': str(e),
+            'error_type': type(e).__name__
+        }), 422
 
 # Update a group
 @groups_bp.route('/<group_id>', methods=['PUT'])
@@ -411,42 +566,38 @@ def request_withdrawal(group_id):
     user_id = get_jwt_identity()
     data = request.get_json()
     
-    # Check if group exists
-    group = Group.query.get(group_id)
-    if not group:
-        return jsonify({'message': 'Group not found'}), 404
-    
-    # Check if group is active
-    if group.status != 'active':
-        return jsonify({'message': 'This group is not active'}), 400
-    
     # Check if user is a member of the group
     membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id, is_active=True).first()
     if not membership:
         return jsonify({'message': 'You are not a member of this group'}), 403
     
-    # Validate required fields
-    required_fields = ['amount']
-    for field in required_fields:
-        if field not in data:
-            return jsonify({'message': f'Missing required field: {field}'}), 400
+    # Get group
+    group = Group.query.get(group_id)
+    if not group:
+        return jsonify({'message': 'Group not found'}), 404
     
-    # Check if the user has enough balance to withdraw
-    user_contributions = Transaction.query.filter_by(
-        user_id=user_id,
+    # Check if required fields are present
+    if 'amount' not in data:
+        return jsonify({'message': 'Amount is required'}), 400
+    
+    # Calculate available balance
+    total_contributions = Transaction.query.filter_by(
         group_id=group_id,
         transaction_type='contribution',
         status='completed'
     ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
     
-    user_withdrawals = Transaction.query.filter_by(
-        user_id=user_id,
+    total_withdrawals = Transaction.query.filter_by(
         group_id=group_id,
         transaction_type='withdrawal',
         status='completed'
     ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
     
-    available_balance = user_contributions - user_withdrawals
+    available_balance = total_contributions - total_withdrawals
+    
+    # Check if withdrawal amount is valid
+    if float(data['amount']) <= 0:
+        return jsonify({'message': 'Withdrawal amount must be greater than zero'}), 400
     
     if float(data['amount']) > available_balance:
         return jsonify({'message': 'Insufficient balance for withdrawal'}), 400
@@ -464,9 +615,62 @@ def request_withdrawal(group_id):
     db.session.add(transaction)
     db.session.commit()
     
-    # Notify admins about the withdrawal request
-    from api.notifications import notify_admins
-    notify_admins(transaction.id, user_id, group_id, 'withdrawal_request')
+    # Get requesting user information for notifications
+    requesting_user = User.query.get(user_id)
+    requester_name = f"{requesting_user.first_name} {requesting_user.last_name}"
+    
+    # Find all admins of the group
+    admin_members = GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).all()
+    from models.notification import Notification
+    
+    # Create notifications for all admins
+    for admin_member in admin_members:
+        # Skip if it's the same user (though unlikely an admin would request approval from themselves)
+        if admin_member.user_id == user_id:
+            continue
+            
+        # Create notification
+        notification = Notification(
+            recipient_id=admin_member.user_id,
+            transaction_id=transaction.id,
+            message=f"{requester_name} has requested a withdrawal of ${data['amount']} from group '{group.name}'. Please review.",
+            notification_type="withdrawal_request",
+            is_read=False
+        )
+        db.session.add(notification)
+    
+    db.session.commit()
+    
+    # Try to send email notifications to all admins
+    try:
+        from flask_mail import Message
+        from app import mail
+        
+        for admin_member in admin_members:
+            if admin_member.user_id == user_id:
+                continue
+                
+            admin = User.query.get(admin_member.user_id)
+            if admin and admin.email:
+                email_subject = f"New Withdrawal Request - {group.name}"
+                email_message = Message(
+                    subject=email_subject,
+                    recipients=[admin.email],
+                    body=f"""
+                    Hello {admin.first_name},
+
+                    {requester_name} has requested a withdrawal of ${data['amount']} from group '{group.name}'.
+                    
+                    Please log in to the platform to review and process this request.
+
+                    Regards,
+                    Group Savings App Team
+                    """
+                )
+                mail.send(email_message)
+    except Exception as e:
+        # Log error but continue (don't fail if email fails)
+        print(f"Error sending email notification: {e}")
     
     return jsonify({
         'message': 'Withdrawal request submitted successfully',
@@ -480,10 +684,18 @@ def process_withdrawal(group_id, transaction_id):
     user_id = get_jwt_identity()
     data = request.get_json()
     
-    # Check if user is an admin of the group
+    # Get the group
+    group = Group.query.get(group_id)
+    if not group:
+        return jsonify({'message': 'Group not found'}), 404
+    
+    # Check if user is an admin of the group or the group creator
     membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id, role='admin', is_active=True).first()
     if not membership:
         return jsonify({'message': 'You do not have permission to process withdrawal requests'}), 403
+    
+    # Additional check if the user is the group creator for extra security
+    is_creator = group.creator_id == user_id
     
     # Get the transaction
     transaction = Transaction.query.get(transaction_id)
@@ -563,7 +775,12 @@ def process_withdrawal(group_id, transaction_id):
     
     return jsonify({
         'message': f'Withdrawal request {action}',
-        'transaction': transaction.to_dict()
+        'transaction': transaction.to_dict(),
+        'processedBy': {
+            'id': admin.id,
+            'name': f"{admin.first_name} {admin.last_name}",
+            'isCreator': is_creator
+        }
     }), 200
 
 # Get group statistics

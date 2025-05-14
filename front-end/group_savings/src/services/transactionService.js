@@ -30,7 +30,9 @@ export const transactionService = {
       if (options.userId) params.append('userId', options.userId);
       
       const queryString = params.toString() ? `?${params.toString()}` : '';
-      return await api.get(`/groups/${groupId}/transactions${queryString}`);
+      
+      // Use the correct endpoint
+      return await api.get(`/transactions/group/${groupId}${queryString}`);
     } catch (error) {
       throw error;
     }
@@ -39,7 +41,8 @@ export const transactionService = {
   // Get a specific transaction details
   async getTransactionById(transactionId) {
     try {
-      return await api.get(`/transactions/${transactionId}`);
+      const response = await api.get(`/transactions/${transactionId}`);
+      return response.data || {};
     } catch (error) {
       throw error;
     }

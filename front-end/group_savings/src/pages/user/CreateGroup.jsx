@@ -150,11 +150,22 @@ const CreateGroup = () => {
         const groupId = response.id || (response.group && response.group.id);
         
         if (groupId) {
-          navigate(`/groups/${groupId}`);
+          navigate(`/groups/${groupId}`, { 
+            state: { 
+              message: 'Group created successfully!',
+              newGroup: true,
+              groupCreated: true
+            } 
+          });
         } else {
-          // If we can't find the ID, go back to dashboard
+          // If we can't find the ID, go back to dashboard with groupCreated flag
           setError("Group was created but couldn't navigate to it. Redirecting to dashboard...");
-          setTimeout(() => navigate('/dashboard'), 2000);
+          setTimeout(() => navigate('/dashboard', { 
+            state: { 
+              message: 'Group created successfully!',
+              groupCreated: true 
+            }
+          }), 2000);
         }
       } catch (apiError) {
         console.error('API Error Response:', apiError);
@@ -180,7 +191,7 @@ const CreateGroup = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Create a New Savings Group</h1>
-        <Button variant="outline" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+        <Button variant="primary" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
       </div>
 
       {error && (
@@ -350,7 +361,7 @@ const CreateGroup = () => {
           <div className="flex justify-end space-x-4 pt-4 border-t">
             <Button 
               type="button" 
-              variant="outline" 
+              variant="primary" 
               onClick={() => navigate('/dashboard')}
             >
               Cancel
