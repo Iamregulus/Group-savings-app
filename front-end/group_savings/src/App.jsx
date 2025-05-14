@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/layout.css';
 
@@ -39,6 +39,20 @@ import NetworkStatusChecker from './components/common/NetworkStatusChecker';
 const AppContent = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { darkMode } = useTheme();
+  const navigate = useNavigate();
+
+  // Listen for network status to clear route if needed
+  useEffect(() => {
+    const handleOffline = () => {
+      console.log('App is offline, network status has changed');
+    };
+
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [navigate]);
 
   const toggleMobileSidebar = () => {
     setIsMobileSidebarOpen(!isMobileSidebarOpen);
@@ -149,17 +163,15 @@ const AppContent = () => {
 
 function App() {
   return (
-    <HashRouter basename="/">
-      <ThemeProvider>
-        <AuthProvider>
-          <NotificationProvider>
-            <NetworkStatusChecker>
-              <AppContent />
-            </NetworkStatusChecker>
-          </NotificationProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </HashRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <NetworkStatusChecker>
+            <AppContent />
+          </NetworkStatusChecker>
+        </NotificationProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
