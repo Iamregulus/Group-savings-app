@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "VITE_API_URL=https://group-savings-app-production.up.railway.app/api vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
