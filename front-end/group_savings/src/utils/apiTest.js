@@ -13,31 +13,30 @@ export const testApiConnection = async () => {
     ? 'https://group-savings-app-production.up.railway.app/api'
     : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
   
-  console.log('Testing API connection to:', apiUrl);
+  const rootUrl = isProduction
+    ? 'https://group-savings-app-production.up.railway.app'
+    : 'http://localhost:5000';
   
+  console.log('Testing API connection...');
+  
+  // Test results
+  const results = {
+    root: null,
+    api: null
+  };
+  
+  // Test root endpoint
   try {
-    const response = await axios.get(apiUrl, { 
+    console.log('Testing root endpoint:', rootUrl);
+    const rootResponse = await axios.get(rootUrl, { 
       timeout: 5000,
       headers: { 'Accept': 'application/json' }
     });
-    console.log('API connection successful:', response.data);
-    return { success: true, data: response.data };
+    console.log('Root endpoint connection successful:', rootResponse.data);
+    results.root = { success: true, data: rootResponse.data };
   } catch (error) {
-    console.error('API connection failed:', error);
-    
-    // Check for specific error types
-    if (error.code === 'ECONNABORTED') {
-      console.error('Connection timed out. The server might be down or unreachable.');
-    } else if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Server responded with error:', error.response.status, error.response.data);
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received from server. CORS issue or server down.');
-    }
-    
-    return { 
+    console.error('Root endpoint connection failed:', error);
+    results.root = { 
       success: false, 
       error: error.message,
       details: {
@@ -47,6 +46,30 @@ export const testApiConnection = async () => {
       }
     };
   }
+  
+  // Test API endpoint
+  try {
+    console.log('Testing API endpoint:', apiUrl);
+    const apiResponse = await axios.get(`${apiUrl}`, { 
+      timeout: 5000,
+      headers: { 'Accept': 'application/json' }
+    });
+    console.log('API endpoint connection successful:', apiResponse.data);
+    results.api = { success: true, data: apiResponse.data };
+  } catch (error) {
+    console.error('API endpoint connection failed:', error);
+    results.api = { 
+      success: false, 
+      error: error.message,
+      details: {
+        code: error.code,
+        response: error.response,
+        request: !!error.request
+      }
+    };
+  }
+  
+  return results;
 };
 
 // Make the function available in the browser console for easy debugging

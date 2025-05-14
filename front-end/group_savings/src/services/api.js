@@ -7,7 +7,7 @@ const isProduction = window.location.protocol === 'https:' ||
 // Create an instance of axios with custom config
 const api = axios.create({
   baseURL: isProduction 
-    ? 'https://group-savings-app-production.up.railway.app/api'  // Railway backend URL
+    ? 'https://group-savings-app-production.up.railway.app/api'  // Railway backend URL with /api
     : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api'),
   headers: {
     'Content-Type': 'application/json',

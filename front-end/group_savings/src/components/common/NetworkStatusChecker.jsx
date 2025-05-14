@@ -15,6 +15,11 @@ const NetworkStatusChecker = ({ children }) => {
     ? 'https://group-savings-app-production.up.railway.app/api'
     : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
 
+  // Root URL for connection testing (without the /api path)
+  const rootUrl = isProduction
+    ? 'https://group-savings-app-production.up.railway.app'
+    : 'http://localhost:5000';
+
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -29,8 +34,11 @@ const NetworkStatusChecker = ({ children }) => {
 
     const checkApiConnection = async () => {
       try {
-        // Try to ping the API root endpoint
-        await axios.get(`${apiUrl}`);
+        // Try to ping the root endpoint instead of /api
+        await axios.get(rootUrl, {
+          timeout: 5000,
+          headers: { 'Accept': 'application/json' }
+        });
         setApiConnected(true);
         setShowApiMessage(false);
       } catch (error) {
