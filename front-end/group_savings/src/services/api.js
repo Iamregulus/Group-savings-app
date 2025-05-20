@@ -27,10 +27,11 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'
+    'X-Requested-With': 'XMLHttpRequest',
+    'Origin': window.location.origin
   },
-  // CORS settings
-  withCredentials: false,
+  // CORS settings - must be true to send credentials
+  withCredentials: true,
   // Set a reasonable timeout (longer for mobile)
   timeout: isMobile ? 45000 : 30000
 });
@@ -206,30 +207,39 @@ api.testConnection = async () => {
     console.log(`Testing ${backendKey} backend: ${backendUrl}`);
     
     try {
-      // Try the main endpoint first
-      const response = await axios.get(`${backendUrl}`, {
+      // Try the main endpoint first with credentials
+      const response = await axios({
+        method: 'get',
+        url: `${backendUrl}`,
         timeout: isMobile ? 45000 : 30000,
+        withCredentials: true,
         headers: { 
           'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
           'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'Origin': window.location.origin
         }
       });
       
-      // Then also check the API endpoint
+      console.log('Root endpoint connection successful:', response.status);
+      
+      // Then also check the API endpoint with credentials
       try {
-        await axios.get(`${backendUrl}/api`, {
+        await axios({
+          method: 'get',
+          url: `${backendUrl}/api`,
           timeout: isMobile ? 45000 : 30000,
+          withCredentials: true,
           headers: { 
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
             'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            'Origin': window.location.origin
           }
         });
         
-        // If we get here, both endpoints are accessible
         console.log(`Backend ${backendKey} is working correctly!`);
         
         // Save this as the working backend
@@ -248,11 +258,58 @@ api.testConnection = async () => {
           isMobile: isMobile
         };
       } catch (apiError) {
-        console.error(`API endpoint on ${backendKey} failed:`, apiError.message);
+        console.error(`API endpoint on ${backendKey} failed:`, apiError);
+        
+        // Check if this is a CORS error
+        const isCorsError = apiError.message && 
+                           (apiError.message.includes('CORS') || 
+                            apiError.message.includes('Network Error') || 
+                            apiError.message.includes('Access-Control-Allow-Origin'));
+        
+        if (isCorsError) {
+          console.error('CORS error detected when accessing API endpoint:', apiError.message);
+          
+          // Try again without credentials as a fallback
+          try {
+            await axios({
+              method: 'get',
+              url: `${backendUrl}/api`,
+              timeout: isMobile ? 45000 : 30000,
+              withCredentials: false,
+              headers: { 
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache, no-store',
+                'Pragma': 'no-cache'
+              }
+            });
+            
+            console.log(`Backend ${backendKey} is working without credentials mode!`);
+            
+            // Since this works without credentials, update the api instance accordingly
+            api.defaults.withCredentials = false;
+            api.defaults.baseURL = `${backendUrl}/api`;
+            localStorage.setItem('lastWorkingBackend', backendKey);
+            
+            return { 
+              success: true, 
+              backendUsed: backendKey,
+              backendUrl: backendUrl,
+              status: response.status, 
+              data: response.data,
+              message: `Connected successfully to ${backendKey} backend (without credentials)`,
+              credentialsMode: 'none',
+              isMobile: isMobile
+            };
+          } catch (fallbackError) {
+            console.error('Fallback connection attempt also failed:', fallbackError);
+            // Continue to next backend
+          }
+        }
         // Continue to next backend if this one had API issues
       }
     } catch (rootError) {
-      console.error(`Root endpoint on ${backendKey} failed:`, rootError.message);
+      console.error(`Root endpoint on ${backendKey} failed:`, rootError);
       // Continue to next backend if this one failed
     }
   }
