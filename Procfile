@@ -1,1 +1,1 @@
-web: python back-end/db_init.py && gunicorn -b 0.0.0.0:$PORT back-end.run:app
+web: cd back-end && python3 -m venv .venv && . .venv/bin/activate && python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app
