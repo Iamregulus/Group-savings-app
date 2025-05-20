@@ -53,9 +53,15 @@ def create_app(test_config=None):
     mail.init_app(app)
     
     # Enable CORS with specific configuration
+    allowed_origins = [
+        "https://group-savings-app-mu.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
+    
     CORS(app, 
-         resources={r"/*": {"origins": "*"}}, 
-         supports_credentials=False,
+         resources={r"/*": {"origins": allowed_origins}}, 
+         supports_credentials=True,
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
          expose_headers=["Content-Type", "Authorization"],
