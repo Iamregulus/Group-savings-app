@@ -34,6 +34,7 @@ import Sidebar from './components/common/Sidebar';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import NotificationDropdown from './components/common/NotificationDropdown';
 import NetworkStatusChecker from './components/common/NetworkStatusChecker';
+import OfflineModeHandler from './components/common/OfflineModeHandler';
 
 // Wrapper component to access theme context
 const AppContent = () => {
@@ -167,6 +168,7 @@ function App() {
       <AuthProvider>
         <NotificationProvider>
           <NetworkStatusChecker>
+            <OfflineModeHandler />
             <AppContent />
           </NetworkStatusChecker>
         </NotificationProvider>

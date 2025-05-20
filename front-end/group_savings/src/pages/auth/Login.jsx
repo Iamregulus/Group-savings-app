@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import api from '../../services/api';
 
 // Simple version without external components to troubleshoot
 const Login = () => {
@@ -94,6 +95,38 @@ const Login = () => {
     handleSubmit({ preventDefault: () => {} });
   };
   
+  const handleDemoLogin = async () => {
+    try {
+      setIsLoading(true);
+      // Enable offline mode with demo data
+      await api.enableOfflineMode();
+      
+      // Simulate login with demo user
+      const demoUser = {
+        id: 'demo-user-123',
+        email: 'demo@example.com',
+        first_name: 'Demo',
+        last_name: 'User',
+        role: 'user'
+      };
+      
+      // Store token and user in localStorage (similar to what auth context would do)
+      localStorage.setItem('token', 'demo_token_12345');
+      localStorage.setItem('user', JSON.stringify(demoUser));
+      
+      // Redirect to dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Demo login error:', error);
+      setErrors({
+        ...errors,
+        form: 'Failed to enter demo mode. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // Updated styles based on the screenshot
   const inputStyle = {
     width: '100%',
@@ -156,10 +189,29 @@ const Login = () => {
         </h1>
         
         {networkError && (
-          <ErrorMessage 
-            message="Network Error: Unable to connect to the server. Please check your internet connection or try again later." 
-            onRetry={handleRetryConnection}
-          />
+          <div>
+            <ErrorMessage 
+              message="Network Error: Unable to connect to the server. Please check your internet connection or try again later." 
+              onRetry={handleRetryConnection}
+            />
+            <div style={{ marginTop: '15px', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={handleDemoLogin}
+                style={{
+                  padding: '10px 20px',
+                  background: '#9c27b0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '16px'
+                }}
+              >
+                Try Demo Mode Instead
+              </button>
+            </div>
+          </div>
         )}
         
         {errors.form && !networkError && (

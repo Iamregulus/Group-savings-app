@@ -7,4 +7,4 @@ startCommand = "python db_init.py && flask run --host=0.0.0.0 --port=$PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "always"
-restartPolicyMaxRetries = 20 
+restartPolicyMaxRetries = 20

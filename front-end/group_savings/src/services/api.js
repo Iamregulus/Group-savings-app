@@ -9,10 +9,20 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
   typeof navigator !== 'undefined' ? navigator.userAgent : ''
 );
 
+// Define multiple backend URLs for fallback
+const backendUrls = {
+  primary: 'https://group-savings-app-production.up.railway.app',
+  fallback: 'https://group-savings-app-backup.onrender.com', // Placeholder for a backup service
+  local: 'http://localhost:5000'
+};
+
+// Use local storage to remember the last working backend
+const lastWorkingBackend = localStorage.getItem('lastWorkingBackend') || 'primary';
+
 // Create an instance of axios with custom config
 const api = axios.create({
   baseURL: isProduction 
-    ? 'https://group-savings-app-production.up.railway.app/api'  // Railway backend URL with /api
+    ? `${backendUrls[lastWorkingBackend]}/api`  // Use remembered backend
     : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api'),
   headers: {
     'Content-Type': 'application/json',
@@ -25,12 +35,41 @@ const api = axios.create({
   timeout: isMobile ? 45000 : 30000
 });
 
+// Offline mode indicator
+let isOfflineMode = false;
+
+// Create a simple cache for offline mode
+const apiCache = {
+  get: (url) => {
+    try {
+      const cachedData = localStorage.getItem(`api_cache_${url}`);
+      return cachedData ? JSON.parse(cachedData) : null;
+    } catch (e) {
+      console.error('Error retrieving from cache:', e);
+      return null;
+    }
+  },
+  set: (url, data) => {
+    try {
+      localStorage.setItem(`api_cache_${url}`, JSON.stringify(data));
+    } catch (e) {
+      console.error('Error setting cache:', e);
+    }
+  }
+};
+
 // Add a request interceptor to add auth token to requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // In offline mode, check cache first (for GET requests)
+    if (isOfflineMode && config.method === 'get') {
+      // Set a flag to check cache in the response interceptor
+      config.checkCache = true;
     }
     
     // Log requests in development only to avoid console spam in production
@@ -56,9 +95,47 @@ api.interceptors.response.use(
     if (import.meta.env.DEV) {
       console.log(`API Response (${response.status}):`, response.config.url);
     }
+    
+    // Cache successful GET responses for offline mode
+    if (response.config.method === 'get') {
+      try {
+        apiCache.set(response.config.url, response.data);
+      } catch (e) {
+        console.error('Error caching response:', e);
+      }
+    }
+    
     return response.data;
   },
   (error) => {
+    // Check if this is a GET request and we're in offline mode or experiencing network issues
+    if (error.config?.method === 'get' && 
+        (isOfflineMode || error.message.includes('Network Error') || error.code === 'ECONNABORTED')) {
+      
+      // Try to get from cache
+      const cachedData = apiCache.get(error.config.url);
+      if (cachedData) {
+        console.log('Using cached data for:', error.config.url);
+        
+        // If this is our first network error, try auto-switching to offline mode
+        if (!isOfflineMode) {
+          console.log('Network unreachable, automatically switching to offline mode');
+          isOfflineMode = true;
+          
+          // Display a notification to the user (using dispatch event so components can listen)
+          const offlineEvent = new CustomEvent('api:offline', { 
+            detail: { 
+              message: 'Network connection lost. Switched to offline mode with cached data.',
+              url: error.config.url
+            } 
+          });
+          window.dispatchEvent(offlineEvent);
+        }
+        
+        return Promise.resolve(cachedData);
+      }
+    }
+    
     // Detailed error logging
     console.error('API Error:', {
       url: error.config?.url,
@@ -122,21 +199,15 @@ api.interceptors.response.use(
 
 // Add a utility method to test connectivity
 api.testConnection = async () => {
-  try {
-    // Try the main endpoint first
-    const response = await axios.get('https://group-savings-app-production.up.railway.app', {
-      timeout: isMobile ? 45000 : 30000,
-      headers: { 
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Cache-Control': 'no-cache, no-store',
-        'Pragma': 'no-cache'
-      }
-    });
+  // Try each backend in sequence
+  for (const [backendKey, backendUrl] of Object.entries(backendUrls)) {
+    if (!isProduction && backendKey !== 'local') continue; // In dev mode, only use local
     
-    // Then also check the API endpoint
+    console.log(`Testing ${backendKey} backend: ${backendUrl}`);
+    
     try {
-      await axios.get('https://group-savings-app-production.up.railway.app/api', {
+      // Try the main endpoint first
+      const response = await axios.get(`${backendUrl}`, {
         timeout: isMobile ? 45000 : 30000,
         headers: { 
           'Accept': 'application/json',
@@ -146,36 +217,163 @@ api.testConnection = async () => {
         }
       });
       
+      // Then also check the API endpoint
+      try {
+        await axios.get(`${backendUrl}/api`, {
+          timeout: isMobile ? 45000 : 30000,
+          headers: { 
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        // If we get here, both endpoints are accessible
+        console.log(`Backend ${backendKey} is working correctly!`);
+        
+        // Save this as the working backend
+        localStorage.setItem('lastWorkingBackend', backendKey);
+        
+        // Update the API baseURL to use this backend
+        api.defaults.baseURL = `${backendUrl}/api`;
+        
+        return { 
+          success: true, 
+          backendUsed: backendKey,
+          backendUrl: backendUrl,
+          status: response.status, 
+          data: response.data,
+          message: `Connected successfully to ${backendKey} backend`,
+          isMobile: isMobile
+        };
+      } catch (apiError) {
+        console.error(`API endpoint on ${backendKey} failed:`, apiError.message);
+        // Continue to next backend if this one had API issues
+      }
+    } catch (rootError) {
+      console.error(`Root endpoint on ${backendKey} failed:`, rootError.message);
+      // Continue to next backend if this one failed
+    }
+  }
+  
+  // If we get here, all backends failed
+  return { 
+    success: false, 
+    error: 'All backend connections failed',
+    message: 'Unable to connect to any backend server',
+    attemptedBackends: Object.keys(backendUrls).filter(key => isProduction || key === 'local')
+  };
+};
+
+// Demo data for offline mode
+const demoData = {
+  '/api/auth/login': { 
+    token: 'demo_token_12345',
+    user: {
+      id: 'demo-user-123',
+      email: 'demo@example.com',
+      first_name: 'Demo',
+      last_name: 'User',
+      role: 'user'
+    },
+    message: 'Demo login successful' 
+  },
+  '/api/groups': [
+    {
+      id: 'demo-group-1',
+      name: 'Demo Savings Group',
+      description: 'A demo savings group for testing offline mode',
+      target_amount: 1000,
+      contribution_amount: 100,
+      current_amount: 300,
+      member_count: 3,
+      creator_id: 'demo-user-123',
+      created_at: new Date().toISOString()
+    }
+  ],
+  '/api/users/profile': {
+    id: 'demo-user-123',
+    email: 'demo@example.com',
+    first_name: 'Demo',
+    last_name: 'User',
+    role: 'user',
+    is_email_verified: true,
+    created_at: new Date().toISOString()
+  }
+};
+
+// Add functions to control offline mode
+api.enableOfflineMode = () => {
+  isOfflineMode = true;
+  console.log('Offline mode enabled.');
+  
+  // Add demo data to cache
+  Object.entries(demoData).forEach(([url, data]) => {
+    apiCache.set(url, data);
+  });
+  
+  return { status: 'success', message: 'Offline mode enabled with demo data' };
+};
+
+api.disableOfflineMode = async () => {
+  // Test connection first
+  const connectionTest = await api.testConnection();
+  
+  if (connectionTest.success) {
+    isOfflineMode = false;
+    console.log('Online mode restored. Using backend:', connectionTest.backendUsed);
+    return { 
+      status: 'success', 
+      message: `Online mode restored. Connected to ${connectionTest.backendUsed} backend.`,
+      backend: connectionTest.backendUsed
+    };
+  } else {
+    // Stay in offline mode
+    console.log('Cannot switch to online mode: No backend available');
+    return { 
+      status: 'error', 
+      message: 'Cannot switch to online mode: No backend available',
+      details: connectionTest
+    };
+  }
+};
+
+// Add a utility function to get current status
+api.getConnectionStatus = async () => {
+  if (isOfflineMode) {
+    return { 
+      status: 'offline', 
+      mode: 'offline', 
+      message: 'Using cached data in offline mode'
+    };
+  }
+  
+  // Test connection
+  try {
+    const connectionTest = await api.testConnection();
+    if (connectionTest.success) {
       return { 
-        success: true, 
-        status: response.status, 
-        data: response.data,
-        message: 'Both root and API endpoints are accessible',
-        isMobile: isMobile
+        status: 'online',
+        mode: 'online',
+        backend: connectionTest.backendUsed,
+        backendUrl: connectionTest.backendUrl,
+        message: `Connected to ${connectionTest.backendUsed} backend`
       };
-    } catch (apiError) {
+    } else {
       return { 
-        success: false, 
-        rootSuccess: true,
-        apiSuccess: false,
-        error: 'API endpoint inaccessible: ' + apiError.message,
-        code: apiError.code,
-        response: apiError.response ? {
-          status: apiError.response.status,
-          statusText: apiError.response.statusText
-        } : null
+        status: 'error',
+        mode: 'online_but_unreachable',
+        message: 'Unable to connect to any backend server',
+        details: connectionTest
       };
     }
-  } catch (rootError) {
+  } catch (error) {
     return { 
-      success: false, 
-      rootSuccess: false,
-      error: 'Root endpoint inaccessible: ' + rootError.message,
-      code: rootError.code,
-      response: rootError.response ? {
-        status: rootError.response.status,
-        statusText: rootError.response.statusText
-      } : null
+      status: 'error',
+      mode: 'unknown',
+      message: 'Error checking connection status',
+      error: error.message
     };
   }
 };
