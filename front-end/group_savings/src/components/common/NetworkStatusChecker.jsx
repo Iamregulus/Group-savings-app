@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import api from '../../services/api';
 
+// Mobile check
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+  typeof navigator !== 'undefined' ? navigator.userAgent : ''
+);
+
 const NetworkStatusChecker = ({ children }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineMessage, setShowOfflineMessage] = useState(false);
@@ -39,8 +44,13 @@ const NetworkStatusChecker = ({ children }) => {
       try {
         // First try to ping the root endpoint
         const rootResult = await axios.get(rootUrl, {
-          timeout: 30000,
-          headers: { 'Accept': 'application/json' }
+          timeout: isMobile ? 45000 : 30000,
+          headers: { 
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          }
         });
         
         console.log('Root endpoint connection successful:', rootResult.status);
@@ -48,8 +58,13 @@ const NetworkStatusChecker = ({ children }) => {
         // If root connection works, also try the API endpoint
         try {
           const apiResult = await axios.get(`${apiUrl}`, {
-            timeout: 30000,
-            headers: { 'Accept': 'application/json' }
+            timeout: isMobile ? 45000 : 30000,
+            headers: { 
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Cache-Control': 'no-cache, no-store',
+              'Pragma': 'no-cache'
+            }
           });
           console.log('API endpoint connection successful:', apiResult.status);
           setApiConnected(true);
@@ -178,9 +193,11 @@ const NetworkStatusChecker = ({ children }) => {
     let detailMessage = '';
     
     if (errorDetails.code === 'ECONNABORTED') {
-      detailMessage = `The request timed out after 30 seconds. The server might be starting up or experiencing high load.`;
+      detailMessage = `The request timed out after ${isMobile ? '45' : '30'} seconds. The server might be starting up or experiencing high load.`;
     } else if (errorDetails.message.includes('Network Error')) {
-      detailMessage = `This could be due to CORS restrictions or the server being temporarily unavailable.`;
+      detailMessage = isMobile 
+        ? `This could be due to mobile network restrictions or the server being temporarily unavailable. Try using WiFi if you're on cellular data.`
+        : `This could be due to CORS restrictions or the server being temporarily unavailable.`;
     } else if (errorDetails.status === 502) {
       detailMessage = `The server is currently down or restarting. Please try again in a few minutes.`;
     } else if (errorDetails.status === 500) {

@@ -4,6 +4,11 @@ import axios from 'axios';
 const isProduction = window.location.protocol === 'https:' || 
                      window.location.hostname.includes('vercel.app');
 
+// Mobile check
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+  typeof navigator !== 'undefined' ? navigator.userAgent : ''
+);
+
 // Create an instance of axios with custom config
 const api = axios.create({
   baseURL: isProduction 
@@ -11,12 +16,13 @@ const api = axios.create({
     : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api'),
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest'
   },
-  // Add CORS settings
+  // CORS settings
   withCredentials: false,
-  // Set a reasonable timeout
-  timeout: 30000
+  // Set a reasonable timeout (longer for mobile)
+  timeout: isMobile ? 45000 : 30000
 });
 
 // Add a request interceptor to add auth token to requests
@@ -119,22 +125,33 @@ api.testConnection = async () => {
   try {
     // Try the main endpoint first
     const response = await axios.get('https://group-savings-app-production.up.railway.app', {
-      timeout: 30000,
-      headers: { 'Accept': 'application/json' }
+      timeout: isMobile ? 45000 : 30000,
+      headers: { 
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache'
+      }
     });
     
     // Then also check the API endpoint
     try {
       await axios.get('https://group-savings-app-production.up.railway.app/api', {
-        timeout: 30000,
-        headers: { 'Accept': 'application/json' }
+        timeout: isMobile ? 45000 : 30000,
+        headers: { 
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
       });
       
       return { 
         success: true, 
         status: response.status, 
         data: response.data,
-        message: 'Both root and API endpoints are accessible'
+        message: 'Both root and API endpoints are accessible',
+        isMobile: isMobile
       };
     } catch (apiError) {
       return { 

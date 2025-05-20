@@ -53,17 +53,13 @@ def create_app(test_config=None):
     mail.init_app(app)
     
     # Enable CORS with specific configuration
-    CORS(app, resources={r"/*": {
-        "origins": [
-            "https://group-savings-app.vercel.app",
-            "https://group-savings-app-mu.vercel.app",
-            "http://localhost:5173",  # Vite default port
-            "http://localhost:3000",  # Alternate dev port
-            "*"  # Allow all origins as fallback
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "Accept"]
-    }})
+    CORS(app, 
+         resources={r"/*": {"origins": "*"}}, 
+         supports_credentials=False,
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+         expose_headers=["Content-Type", "Authorization"],
+         max_age=600)
 
     # Register blueprints
     from api.auth import auth_bp
