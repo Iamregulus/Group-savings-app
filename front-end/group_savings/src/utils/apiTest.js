@@ -1,5 +1,10 @@
 import axios from 'axios';
 
+// Mobile check
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+  typeof navigator !== 'undefined' ? navigator.userAgent : ''
+);
+
 /**
  * Utility function to test API connectivity
  * This can be imported and used in the browser console for debugging
@@ -19,12 +24,14 @@ export const testApiConnection = async () => {
   
   console.log('Testing API connection...');
   console.log('Environment:', isProduction ? 'Production' : 'Development');
+  console.log('Device type:', isMobile ? 'Mobile' : 'Desktop');
   console.log('Root URL:', rootUrl);
   console.log('API URL:', apiUrl);
   
   // Test results
   const results = {
     environment: isProduction ? 'production' : 'development',
+    deviceType: isMobile ? 'mobile' : 'desktop',
     timestamp: new Date().toISOString(),
     browserInfo: navigator.userAgent,
     root: null,
@@ -36,8 +43,13 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing root endpoint:', rootUrl);
     const rootResponse = await axios.get(rootUrl, { 
-      timeout: 30000,
-      headers: { 'Accept': 'application/json' }
+      timeout: isMobile ? 45000 : 30000,
+      headers: { 
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache'
+      }
     });
     console.log('Root endpoint connection successful:', rootResponse.status);
     results.root = { 
@@ -67,8 +79,13 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing API endpoint:', apiUrl);
     const apiResponse = await axios.get(`${apiUrl}`, { 
-      timeout: 30000,
-      headers: { 'Accept': 'application/json' }
+      timeout: isMobile ? 45000 : 30000,
+      headers: { 
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache'
+      }
     });
     console.log('API endpoint connection successful:', apiResponse.status);
     results.api = { 
@@ -98,8 +115,13 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing auth health endpoint:', `${apiUrl}/auth`);
     const authResponse = await axios.get(`${apiUrl}/auth`, { 
-      timeout: 30000,
-      headers: { 'Accept': 'application/json' }
+      timeout: isMobile ? 45000 : 30000,
+      headers: { 
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache'
+      }
     });
     console.log('Auth endpoint connection successful:', authResponse.status);
     results.authTest = { 
@@ -141,7 +163,16 @@ export const testApiConnection = async () => {
     if (!results.root.success && !results.api.success) {
       console.log('- Check if the backend server is running at', rootUrl);
       console.log('- Verify your internet connection');
-      console.log('- Check for CORS issues - the browser might be blocking cross-origin requests');
+      
+      if (isMobile) {
+        console.log('- Mobile-specific troubleshooting:');
+        console.log('  * Try switching from cellular data to WiFi or vice versa');
+        console.log('  * Check if your mobile carrier restricts certain connections');
+        console.log('  * Disable any VPN or proxy services you may be using');
+      } else {
+        console.log('- Check for CORS issues - the browser might be blocking cross-origin requests');
+        console.log('- Try disabling any browser extensions that might be interfering with network requests');
+      }
     } else if (results.root.success && !results.api.success) {
       console.log('- The server is reachable but the API endpoints are not accessible');
       console.log('- Check if the API routes are configured correctly on the backend');
