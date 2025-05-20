@@ -16,7 +16,7 @@ const api = axios.create({
   // Add CORS settings
   withCredentials: false,
   // Set a reasonable timeout
-  timeout: 10000
+  timeout: 30000
 });
 
 // Add a request interceptor to add auth token to requests
@@ -119,14 +119,14 @@ api.testConnection = async () => {
   try {
     // Try the main endpoint first
     const response = await axios.get('https://group-savings-app-production.up.railway.app', {
-      timeout: 5000,
+      timeout: 30000,
       headers: { 'Accept': 'application/json' }
     });
     
     // Then also check the API endpoint
     try {
       await axios.get('https://group-savings-app-production.up.railway.app/api', {
-        timeout: 5000,
+        timeout: 30000,
         headers: { 'Accept': 'application/json' }
       });
       

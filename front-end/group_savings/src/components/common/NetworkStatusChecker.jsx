@@ -39,7 +39,7 @@ const NetworkStatusChecker = ({ children }) => {
       try {
         // First try to ping the root endpoint
         const rootResult = await axios.get(rootUrl, {
-          timeout: 5000,
+          timeout: 30000,
           headers: { 'Accept': 'application/json' }
         });
         
@@ -48,7 +48,7 @@ const NetworkStatusChecker = ({ children }) => {
         // If root connection works, also try the API endpoint
         try {
           const apiResult = await axios.get(`${apiUrl}`, {
-            timeout: 5000,
+            timeout: 30000,
             headers: { 'Accept': 'application/json' }
           });
           console.log('API endpoint connection successful:', apiResult.status);
@@ -172,15 +172,24 @@ const NetworkStatusChecker = ({ children }) => {
 
   // Get appropriate error message based on error details
   const getErrorMessage = () => {
-    if (!errorDetails) return 'Cannot connect to the server.';
+    if (!errorDetails) return 'Network connection to the server could not be established.';
     
-    if (errorDetails.type === 'Root Endpoint') {
-      return 'Unable to connect to the server. The backend service may be down.';
-    } else if (errorDetails.type === 'API Endpoint') {
-      return 'Connected to server but API endpoints are unavailable. The service might be misconfigured.';
+    let baseMessage = `Network Error: Unable to connect to the ${errorDetails.type.toLowerCase()}.`;
+    let detailMessage = '';
+    
+    if (errorDetails.code === 'ECONNABORTED') {
+      detailMessage = `The request timed out after 30 seconds. The server might be starting up or experiencing high load.`;
+    } else if (errorDetails.message.includes('Network Error')) {
+      detailMessage = `This could be due to CORS restrictions or the server being temporarily unavailable.`;
+    } else if (errorDetails.status === 502) {
+      detailMessage = `The server is currently down or restarting. Please try again in a few minutes.`;
+    } else if (errorDetails.status === 500) {
+      detailMessage = `The server encountered an internal error. Please try again later.`;
     } else {
-      return 'Network connectivity issue detected. Please check your connection or try again later.';
+      detailMessage = `Error: ${errorDetails.message}`;
     }
+    
+    return `${baseMessage} ${detailMessage}`;
   };
 
   return (
@@ -244,7 +253,7 @@ const NetworkStatusChecker = ({ children }) => {
           maxWidth: '90%',
           width: 'auto'
         }}>
-          <span>Network Error: {getErrorMessage()}</span>
+          <span>{getErrorMessage()}</span>
           {errorDetails && (
             <div style={{ fontSize: '12px', color: '#aaa', marginTop: '5px', textAlign: 'left', width: '100%' }}>
               Error: {errorDetails.message}

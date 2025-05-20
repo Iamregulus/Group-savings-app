@@ -36,7 +36,7 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing root endpoint:', rootUrl);
     const rootResponse = await axios.get(rootUrl, { 
-      timeout: 5000,
+      timeout: 30000,
       headers: { 'Accept': 'application/json' }
     });
     console.log('Root endpoint connection successful:', rootResponse.status);
@@ -67,7 +67,7 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing API endpoint:', apiUrl);
     const apiResponse = await axios.get(`${apiUrl}`, { 
-      timeout: 5000,
+      timeout: 30000,
       headers: { 'Accept': 'application/json' }
     });
     console.log('API endpoint connection successful:', apiResponse.status);
@@ -98,7 +98,7 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing auth health endpoint:', `${apiUrl}/auth`);
     const authResponse = await axios.get(`${apiUrl}/auth`, { 
-      timeout: 5000,
+      timeout: 30000,
       headers: { 'Accept': 'application/json' }
     });
     console.log('Auth endpoint connection successful:', authResponse.status);
