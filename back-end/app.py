@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, make_response, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_sqlalchemy import SQLAlchemy
@@ -52,20 +52,50 @@ def create_app(test_config=None):
     jwt.init_app(app)
     mail.init_app(app)
     
-    # Enable CORS with specific configuration
+    # Define allowed origins
     allowed_origins = [
         "https://group-savings-app-mu.vercel.app",
+        "https://group-savings-app.vercel.app",
         "http://localhost:3000",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        # Include any other frontend origins that need access
     ]
     
+    # Enable CORS with specific configuration
     CORS(app, 
          resources={r"/*": {"origins": allowed_origins}}, 
          supports_credentials=True,
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+         allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
          expose_headers=["Content-Type", "Authorization"],
-         max_age=600)
+         max_age=3600)
+    
+    # Add after-request handler for additional CORS headers
+    @app.after_request
+    def after_request(response):
+        origin = request.headers.get('Origin')
+        if origin and origin in allowed_origins:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+            response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, Origin')
+            response.headers.add('Access-Control-Expose-Headers', 'Content-Type, Authorization')
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+    
+    # Handle OPTIONS requests explicitly
+    @app.route('/', methods=['OPTIONS'])
+    @app.route('/<path:path>', methods=['OPTIONS'])
+    def options_handler(path=''):
+        response = make_response()
+        origin = request.headers.get('Origin')
+        if origin and origin in allowed_origins:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+            response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, Origin')
+            response.headers.add('Access-Control-Expose-Headers', 'Content-Type, Authorization')
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            response.headers.add('Access-Control-Max-Age', '3600')
+        return response
 
     # Register blueprints
     from api.auth import auth_bp
