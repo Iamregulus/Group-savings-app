@@ -66,49 +66,38 @@ def create_app(test_config=None):
     logger.info(f"Flask Environment: {flask_env}")
     logger.info(f"Railway Environment: {railway_env}")
     
-    # Configure CORS based on environment
-    if flask_env == 'development' or railway_env == 'development':
-        # Development: Allow all origins for easier testing
-        logger.info("Development mode: Enabling permissive CORS")
-        CORS(app, supports_credentials=True)
-    else:
-        # Production: Restrict to only the production frontend
-        allowed_origins = [
-            "https://group-savings-app-mu.vercel.app",
-        ]
-        logger.info(f"Production mode: Restricting CORS to origins: {allowed_origins}")
-        CORS(app, 
-             resources={r"/*": {"origins": allowed_origins}}, 
-             supports_credentials=True)
+    # Define allowed origins - temporarily allow all origins for debugging
+    allowed_origins = [
+        "https://group-savings-app-mu.vercel.app",
+        "https://group-savings-app.vercel.app",
+        "*"  # Temporarily allowing all origins for debugging
+    ]
     
-    # Handle direct browser access and health checks in production
-    @app.after_request
-    def after_request(response):
-        origin = request.headers.get('Origin')
-        user_agent = request.headers.get('User-Agent', '')
-        
-        # Allow direct browser access and Railway health checks
-        if not origin or 'RailwayHealthCheck' in user_agent:
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        
-        return response
+    # Enable CORS with specific configuration
+    CORS(app, 
+         resources={r"/*": {"origins": allowed_origins}}, 
+         supports_credentials=True)
     
     # Log CORS-related information
     @app.before_request
     def log_request_info():
         logger.info(f"Request: {request.method} {request.path}")
         logger.info(f"Origin: {request.headers.get('Origin', 'None')}")
-        logger.info(f"User-Agent: {request.headers.get('User-Agent', 'None')}")
         logger.info(f"Headers: {dict(request.headers)}")
-    
-    # Log response headers
+        
+    # Set explicit CORS headers for all responses
     @app.after_request
-    def log_response_info(response):
+    def add_cors_headers(response):
+        response.headers.add('Access-Control-Allow-Origin', '*')  # Temporary for debugging
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, Origin')
+        response.headers.add('Access-Control-Expose-Headers', 'Content-Type, Authorization')
+        
+        # Log response headers
         logger.info("=== RESPONSE HEADERS ===")
         for header, value in response.headers:
             logger.info(f"{header}: {value}")
+        
         return response
 
     # Health check endpoint

@@ -1,1 +1,1 @@
-web: cd back-end && pip install -r requirements.txt && python db_init.py && cd .. && FLASK_ENV=development gunicorn -b 0.0.0.0:$PORT wsgi:app --log-level debug
+web: cd back-end && pip install -r requirements.txt && FLASK_APP=run.py FLASK_ENV=development FLASK_DEBUG=1 python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level debug
