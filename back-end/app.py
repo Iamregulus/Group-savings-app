@@ -58,21 +58,49 @@ def create_app(test_config=None):
     jwt.init_app(app)
     mail.init_app(app)
     
-    # Define allowed origins - restrict to only the production frontend
-    allowed_origins = [
-        "https://group-savings-app-mu.vercel.app",
-    ]
+    # Get the current environment
+    flask_env = os.environ.get('FLASK_ENV', 'production').lower()
+    railway_env = os.environ.get('RAILWAY_ENVIRONMENT', 'production').lower()
     
-    # Enable CORS with specific configuration
-    CORS(app, 
-         resources={r"/*": {"origins": allowed_origins}}, 
-         supports_credentials=True)
+    # Log the environment for debugging
+    logger.info(f"Flask Environment: {flask_env}")
+    logger.info(f"Railway Environment: {railway_env}")
+    
+    # Configure CORS based on environment
+    if flask_env == 'development' or railway_env == 'development':
+        # Development: Allow all origins for easier testing
+        logger.info("Development mode: Enabling permissive CORS")
+        CORS(app, supports_credentials=True)
+    else:
+        # Production: Restrict to only the production frontend
+        allowed_origins = [
+            "https://group-savings-app-mu.vercel.app",
+        ]
+        logger.info(f"Production mode: Restricting CORS to origins: {allowed_origins}")
+        CORS(app, 
+             resources={r"/*": {"origins": allowed_origins}}, 
+             supports_credentials=True)
+    
+    # Handle direct browser access and health checks in production
+    @app.after_request
+    def after_request(response):
+        origin = request.headers.get('Origin')
+        user_agent = request.headers.get('User-Agent', '')
+        
+        # Allow direct browser access and Railway health checks
+        if not origin or 'RailwayHealthCheck' in user_agent:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        
+        return response
     
     # Log CORS-related information
     @app.before_request
     def log_request_info():
         logger.info(f"Request: {request.method} {request.path}")
         logger.info(f"Origin: {request.headers.get('Origin', 'None')}")
+        logger.info(f"User-Agent: {request.headers.get('User-Agent', 'None')}")
         logger.info(f"Headers: {dict(request.headers)}")
     
     # Log response headers
@@ -93,7 +121,8 @@ def create_app(test_config=None):
                 "status": "healthy",
                 "version": "1.0.0", 
                 "origin": origin,
-                "environment": os.environ.get('FLASK_ENV', 'production')
+                "environment": os.environ.get('FLASK_ENV', 'production'),
+                "railway_environment": os.environ.get('RAILWAY_ENVIRONMENT', 'production')
             })
         except Exception as e:
             logger.error(f"Error in health check: {str(e)}")
@@ -143,4 +172,4 @@ def create_app(test_config=None):
     def index():
         return {"message": "Welcome to Group Savings API"}
 
-    return app 
+    return app
