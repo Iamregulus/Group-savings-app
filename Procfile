@@ -1,1 +1,1 @@
-web: cd back-end && python3 -m venv .venv && . .venv/bin/activate && python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app
+web: cd back-end && pip install -r requirements.txt && python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level debug

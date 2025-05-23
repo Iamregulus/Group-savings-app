@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test CORS with Group Savings App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f5f5f5;
+            white-space: pre-wrap;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>CORS Test for Group Savings App</h1>
+    
+    <div>
+        <h2>Configure Origin</h2>
+        <select id="originSelect">
+            <option value="https://group-savings-app-mu.vercel.app">Production Frontend (group-savings-app-mu.vercel.app)</option>
+            <option value="http://localhost:3000">Local Development (localhost:3000)</option>
+            <option value="https://malicious-site.example.com">Untrusted Origin (malicious-site.example.com)</option>
+        </select>
+    </div>
+    
+    <div>
+        <h2>Test Endpoints</h2>
+        <button onclick="testHealthEndpoint()">Test /health Endpoint</button>
+        <button onclick="testEchoEndpoint()">Test /api/echo Endpoint</button>
+        <button onclick="testOptionsRequest()">Test OPTIONS Request</button>
+    </div>
+    
+    <div>
+        <h2>Results</h2>
+        <div id="result" class="result">Test results will appear here...</div>
+    </div>
+
+    <script>
+        const backendUrl = 'https://group-savings-app-production.up.railway.app';
+        const resultElement = document.getElementById('result');
+        
+        function getSelectedOrigin() {
+            return document.getElementById('originSelect').value;
+        }
+        
+        function displayResult(title, data) {
+            let output = `${title}\n\n`;
+            
+            if (typeof data === 'object') {
+                output += JSON.stringify(data, null, 2);
+            } else {
+                output += data;
+            }
+            
+            resultElement.textContent = output;
+        }
+        
+        function handleError(error, endpoint) {
+            let errorMsg = `Error accessing ${endpoint}: ${error.message}`;
+            
+            if (error.message.includes('NetworkError') || error.message.includes('CORS')) {
+                errorMsg += '\n\nThis appears to be a CORS error. The server is not allowing requests from this origin.';
+            }
+            
+            displayResult(`Error`, errorMsg);
+            console.error(error);
+        }
+        
+        async function testHealthEndpoint() {
+            const origin = getSelectedOrigin();
+            try {
+                const response = await fetch(`${backendUrl}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': origin
+                    }
+                });
+                
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                const data = await response.json();
+                
+                displayResult('Health Endpoint Results', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    corsHeaders: {
+                        'access-control-allow-origin': headers['access-control-allow-origin'] || 'Not present',
+                        'access-control-allow-methods': headers['access-control-allow-methods'] || 'Not present',
+                        'access-control-allow-credentials': headers['access-control-allow-credentials'] || 'Not present'
+                    },
+                    data: data
+                });
+            } catch (error) {
+                handleError(error, 'Health Endpoint');
+            }
+        }
+        
+        async function testEchoEndpoint() {
+            const origin = getSelectedOrigin();
+            try {
+                const response = await fetch(`${backendUrl}/api/echo`, {
+                    method: 'POST',
+                    headers: {
+                        'Origin': origin,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Hello from test',
+                        timestamp: new Date().toISOString(),
+                        origin: origin
+                    })
+                });
+                
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                const data = await response.json();
+                
+                displayResult('Echo Endpoint Results', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    corsHeaders: {
+                        'access-control-allow-origin': headers['access-control-allow-origin'] || 'Not present',
+                        'access-control-allow-methods': headers['access-control-allow-methods'] || 'Not present',
+                        'access-control-allow-credentials': headers['access-control-allow-credentials'] || 'Not present'
+                    },
+                    data: data
+                });
+            } catch (error) {
+                handleError(error, 'Echo Endpoint');
+            }
+        }
+        
+        async function testOptionsRequest() {
+            const origin = getSelectedOrigin();
+            try {
+                const response = await fetch(`${backendUrl}/api/echo`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type, Authorization'
+                    }
+                });
+                
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                displayResult('OPTIONS Request Results', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    corsHeaders: {
+                        'access-control-allow-origin': headers['access-control-allow-origin'] || 'Not present',
+                        'access-control-allow-methods': headers['access-control-allow-methods'] || 'Not present',
+                        'access-control-allow-headers': headers['access-control-allow-headers'] || 'Not present',
+                        'access-control-allow-credentials': headers['access-control-allow-credentials'] || 'Not present',
+                        'access-control-max-age': headers['access-control-max-age'] || 'Not present'
+                    }
+                });
+            } catch (error) {
+                handleError(error, 'OPTIONS Request');
+            }
+        }
+    </script>
+</body>
+</html> 

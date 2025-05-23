@@ -1,5 +1,6 @@
 import os
-from flask import Flask, make_response, request
+import logging
+from flask import Flask, make_response, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_sqlalchemy import SQLAlchemy
@@ -9,6 +10,11 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('group_savings_app')
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -52,50 +58,70 @@ def create_app(test_config=None):
     jwt.init_app(app)
     mail.init_app(app)
     
-    # Define allowed origins
+    # Define allowed origins - restrict to only the production frontend
     allowed_origins = [
         "https://group-savings-app-mu.vercel.app",
-        "https://group-savings-app.vercel.app",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        # Include any other frontend origins that need access
     ]
     
     # Enable CORS with specific configuration
     CORS(app, 
          resources={r"/*": {"origins": allowed_origins}}, 
-         supports_credentials=True,
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
-         expose_headers=["Content-Type", "Authorization"],
-         max_age=3600)
+         supports_credentials=True)
     
-    # Add after-request handler for additional CORS headers
+    # Log CORS-related information
+    @app.before_request
+    def log_request_info():
+        logger.info(f"Request: {request.method} {request.path}")
+        logger.info(f"Origin: {request.headers.get('Origin', 'None')}")
+        logger.info(f"Headers: {dict(request.headers)}")
+    
+    # Log response headers
     @app.after_request
-    def after_request(response):
-        origin = request.headers.get('Origin')
-        if origin and origin in allowed_origins:
-            response.headers.add('Access-Control-Allow-Origin', origin)
-            response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, Origin')
-            response.headers.add('Access-Control-Expose-Headers', 'Content-Type, Authorization')
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
+    def log_response_info(response):
+        logger.info("=== RESPONSE HEADERS ===")
+        for header, value in response.headers:
+            logger.info(f"{header}: {value}")
         return response
+
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        try:
+            origin = request.headers.get('Origin', 'Unknown')
+            logger.info(f"Health check from origin: {origin}")
+            return jsonify({
+                "status": "healthy",
+                "version": "1.0.0", 
+                "origin": origin,
+                "environment": os.environ.get('FLASK_ENV', 'production')
+            })
+        except Exception as e:
+            logger.error(f"Error in health check: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
     
-    # Handle OPTIONS requests explicitly
-    @app.route('/', methods=['OPTIONS'])
-    @app.route('/<path:path>', methods=['OPTIONS'])
-    def options_handler(path=''):
-        response = make_response()
-        origin = request.headers.get('Origin')
-        if origin and origin in allowed_origins:
-            response.headers.add('Access-Control-Allow-Origin', origin)
-            response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With, Origin')
-            response.headers.add('Access-Control-Expose-Headers', 'Content-Type, Authorization')
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
-            response.headers.add('Access-Control-Max-Age', '3600')
-        return response
+    # Echo endpoint for testing
+    @app.route('/api/echo', methods=['POST'])
+    def echo():
+        try:
+            origin = request.headers.get('Origin', 'Unknown')
+            logger.info(f"Echo request from origin: {origin}")
+            data = request.get_json(silent=True) or {}
+            response_data = {
+                "echoed_data": data,
+                "origin": origin,
+                "headers": dict(request.headers),
+                "method": request.method
+            }
+            return jsonify(response_data)
+        except Exception as e:
+            logger.error(f"Error in echo endpoint: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
 
     # Register blueprints
     from api.auth import auth_bp
