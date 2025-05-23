@@ -1,5 +1,6 @@
 import os
 import logging
+import sys
 from flask import Flask, make_response, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -110,8 +111,7 @@ def create_app(test_config=None):
                 "status": "healthy",
                 "version": "1.0.0", 
                 "origin": origin,
-                "environment": os.environ.get('FLASK_ENV', 'production'),
-                "railway_environment": os.environ.get('RAILWAY_ENVIRONMENT', 'production')
+                "environment": os.environ.get('FLASK_ENV', 'production')
             })
         except Exception as e:
             logger.error(f"Error in health check: {str(e)}")
@@ -120,6 +120,28 @@ def create_app(test_config=None):
                 "message": str(e)
             }), 500
     
+    # Debug endpoint to verify app is running
+    @app.route('/debug')
+    def debug():
+        logger.info("Debug endpoint accessed")
+        return jsonify({
+            "status": "debug",
+            "message": "Debug endpoint is working",
+            "python_version": sys.version,
+            "port": os.environ.get('PORT', 'Not set'),
+            "flask_env": os.environ.get('FLASK_ENV', 'Not set'),
+            "railway_env": os.environ.get('RAILWAY_ENVIRONMENT', 'Not set')
+        })
+    
+    # Root endpoint
+    @app.route('/')
+    def index():
+        logger.info("Root endpoint accessed")
+        return jsonify({
+            "message": "Welcome to Group Savings API",
+            "status": "running"
+        })
+
     # Echo endpoint for testing
     @app.route('/api/echo', methods=['POST'])
     def echo():
@@ -156,9 +178,5 @@ def create_app(test_config=None):
     
     from api.notifications import notifications_bp
     app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
-
-    @app.route('/')
-    def index():
-        return {"message": "Welcome to Group Savings API"}
 
     return app

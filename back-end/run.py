@@ -23,6 +23,7 @@ os.environ['FLASK_ENV'] = 'development'
 os.environ['FLASK_DEBUG'] = '1'
 
 try:
+    # Create app
     app = create_app()
     logger.info("App created successfully")
     
@@ -34,16 +35,6 @@ try:
 except Exception as e:
     logger.error(f"Error creating app: {str(e)}", exc_info=True)
     raise
-
-# Add a test endpoint to verify the app is running
-@app.route('/debug')
-def debug():
-    return {
-        "status": "debug",
-        "message": "Debug endpoint is working",
-        "python_version": sys.version,
-        "environment": dict(os.environ)
-    }
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
