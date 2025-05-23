@@ -3,7 +3,7 @@ builder = "nixpacks"
 buildCommand = "python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
 
 [deploy]
-startCommand = ". .venv/bin/activate && python db_init.py && gunicorn -b 0.0.0.0:$PORT wsgi:app"
+startCommand = ". .venv/bin/activate && python db_init.py && cd .. && gunicorn -b 0.0.0.0:$PORT wsgi:app"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "always"
