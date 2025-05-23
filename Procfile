@@ -1,1 +1,1 @@
-web: cd back-end && pip install -r requirements.txt && python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level debug
+web: pip install -r back-end/requirements.txt && python back-end/db_init.py && gunicorn -b 0.0.0.0:$PORT wsgi:app --log-level debug
