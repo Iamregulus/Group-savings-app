@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pip install -r requirements.txt"
+buildCommand = "pip install -r requirements.txt gunicorn"
 
 [deploy]
-startCommand = "python db_init.py && cd .. && FLASK_ENV=development gunicorn -b 0.0.0.0:$PORT wsgi:app --log-level debug"
+startCommand = "python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level debug"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "always"
