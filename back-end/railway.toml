@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd back-end && pip install -r requirements.txt"
+buildCommand = "pip install -r requirements.txt"
 
 [deploy]
-startCommand = "cd back-end && python db_init.py && gunicorn -b 0.0.0.0:${PORT:-8080} run:app --log-level debug --timeout 120"
+startCommand = "python db_init.py && gunicorn -b 0.0.0.0:${PORT:-8080} run:app --log-level debug --timeout 120"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "always"
