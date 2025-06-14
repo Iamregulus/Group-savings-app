@@ -2,8 +2,8 @@ services:
   - type: web
     name: savings-app-backend
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level info --timeout 120 --workers 1 --worker-class sync
+    buildCommand: cd back-end && pip install -r requirements.txt
+    startCommand: cd back-end && python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level info --timeout 120 --workers 1 --worker-class sync
     envVars:
       - key: DATABASE_URL
         value: postgresql://savings_app_database_user:joEr2jAdMaPPgaGyrXossFFJG08ukk11@dpg-d16hucvdiees73d5rs10-a.frankfurt-postgres.render.com/savings_app_database
