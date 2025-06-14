@@ -16,11 +16,13 @@ logger.info(f"Current directory: {os.getcwd()}")
 # Log important environment variables
 logger.info(f"PORT: {os.environ.get('PORT', 'Not set')}")
 logger.info(f"FLASK_ENV: {os.environ.get('FLASK_ENV', 'Not set')}")
-logger.info(f"RAILWAY_ENVIRONMENT: {os.environ.get('RAILWAY_ENVIRONMENT', 'Not set')}")
 
-# Force development mode for debugging
-os.environ['FLASK_ENV'] = 'development'
-os.environ['FLASK_DEBUG'] = '1'
+# Set environment based on FLASK_ENV
+flask_env = os.environ.get('FLASK_ENV', 'development')
+if flask_env == 'production':
+    os.environ['FLASK_DEBUG'] = '0'
+else:
+    os.environ['FLASK_DEBUG'] = '1'
 
 try:
     # Create app

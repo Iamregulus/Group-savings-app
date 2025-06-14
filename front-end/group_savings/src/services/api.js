@@ -19,6 +19,25 @@ const backendUrls = {
 // Use local storage to remember the last working backend
 const lastWorkingBackend = localStorage.getItem('lastWorkingBackend') || 'primary';
 
+// Function to test backend connectivity
+const testBackendConnection = async (url) => {
+  try {
+    const response = await fetch(`${url}/health`, {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    console.error(`Backend ${url} is not reachable:`, error);
+    return false;
+  }
+};
+
 // Create an instance of axios with custom config
 const api = axios.create({
   baseURL: isProduction 
@@ -27,8 +46,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
-    'Origin': window.location.origin
+    'X-Requested-With': 'XMLHttpRequest'
   },
   // CORS settings - must be true to send credentials
   withCredentials: true,
