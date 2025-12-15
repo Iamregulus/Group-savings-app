@@ -47,11 +47,10 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('Attempting login with:', email, password);
-      const response = await authService.login(email, password);
-      
-      console.log('Login response:', response);
+      const normalizedEmail = (email || '').trim().toLowerCase();
+      console.log('Attempting login with:', normalizedEmail, password ? '***' : '');
+
+      const response = await authService.login(normalizedEmail, password);
       
       // Save token to localStorage
       localStorage.setItem('token', response.token);
@@ -73,8 +72,15 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await authService.signup(userData);
+      const normalizedUser = {
+        ...userData,
+        email: (userData.email || '').trim().toLowerCase(),
+        firstName: (userData.firstName || '').trim(),
+        lastName: (userData.lastName || '').trim(),
+        phoneNumber: (userData.phoneNumber || '').trim(),
+      };
+
+      const response = await authService.signup(normalizedUser);
       
       // Save token to localStorage
       localStorage.setItem('token', response.token);

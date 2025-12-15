@@ -60,7 +60,8 @@ const Login = () => {
     
     try {
       setIsLoading(true);
-      const userRole = await login(formData.email, formData.password);
+      const trimmedEmail = formData.email.trim().toLowerCase();
+      const userRole = await login(trimmedEmail, formData.password);
       
       // Redirect based on role
       if (userRole === 'admin') {
