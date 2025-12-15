@@ -28,6 +28,8 @@ const GroupDetail = () => {
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState(location.state?.message || null);
   const [isNewGroup, setIsNewGroup] = useState(location.state?.newGroup || false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Modal states
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -59,6 +61,7 @@ const GroupDetail = () => {
         // Process the group data to ensure all required fields are present
         const processedGroup = {
           ...groupData,
+          isUserMember: !!groupData.userRole, // Add a flag to indicate if the current user is a member
           // Ensure numeric values are correctly processed
           totalSaved: parseFloat(groupData.totalSaved || 0),
           totalWithdrawals: parseFloat(groupData.totalWithdrawals || 0),
@@ -234,8 +237,8 @@ const GroupDetail = () => {
       return;
     }
 
-    if (parseFloat(amount) > group.availableBalance) {
-      setError('Withdrawal amount exceeds available balance');
+    if (parseFloat(amount) > group.userSavings) {
+      setError('Withdrawal amount exceeds your contribution balance.');
       return;
     }
 
@@ -272,6 +275,18 @@ const GroupDetail = () => {
       setError(error.response?.data?.message || 'Failed to leave group. Please try again.');
       setLeavingGroup(false);
       setShowLeaveConfirmModal(false);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    setIsDeleting(true);
+    try {
+      await groupService.deleteGroup(groupId);
+      navigate('/dashboard'); // Redirect to dashboard after deletion
+    } catch (error) {
+      setError('Failed to delete the group. Please try again.');
+      console.error(error);
+      setIsDeleting(false);
     }
   };
 
@@ -314,6 +329,9 @@ const GroupDetail = () => {
       </div>
     );
   }
+
+  // Check if the current user is the creator of the group
+  const isCreator = currentUser?.id === group.creatorId;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -409,7 +427,7 @@ const GroupDetail = () => {
                 </p>
                 <div className="mt-4">
                   <Button
-                    onClick={() => navigate(`/admin/withdrawals/${group.id}`)}
+                    onClick={() => navigate(`/groups/${group.id}/withdrawals`)}
                     className="bg-yellow-600 hover:bg-yellow-700 text-white"
                   >
                     Review Requests
@@ -420,29 +438,6 @@ const GroupDetail = () => {
           </Card>
         </div>
       )}
-
-      <div className="flex flex-wrap gap-4 mb-8">
-        <Button 
-          onClick={() => setShowDepositModal(true)}
-        >
-          Make Contribution
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={() => setShowWithdrawModal(true)}
-          disabled={!group?.availableBalance || group?.availableBalance <= 0}
-        >
-          Request Withdrawal
-        </Button>
-        {canLeaveGroup() && (
-          <Button 
-            variant="danger" 
-            onClick={() => setShowLeaveConfirmModal(true)}
-          >
-            Leave Group
-          </Button>
-        )}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
@@ -491,6 +486,24 @@ const GroupDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Action Buttons */}
+      {group.isUserMember && (
+        <div className="flex flex-wrap gap-4 mt-4 md:mt-0">
+          <Button onClick={() => setShowDepositModal(true)}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+            </svg>
+            Deposit
+          </Button>
+          <Button variant="outline" onClick={() => setShowWithdrawModal(true)}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
+            </svg>
+            Withdraw
+          </Button>
+        </div>
+      )}
 
       {/* Deposit Modal */}
       <Modal
@@ -578,8 +591,8 @@ const GroupDetail = () => {
       >
         <div className="space-y-4 p-2">
           <div className="p-3 bg-gray-50 rounded-md mb-4">
-            <p className="text-sm text-gray-500">Available Balance</p>
-            <p className="text-lg font-semibold">£{group.availableBalance?.toFixed(2) || '0.00'}</p>
+            <p className="text-sm text-gray-500">Your Available Balance</p>
+            <p className="text-lg font-semibold">£{group.userSavings?.toFixed(2) || '0.00'}</p>
           </div>
           <Input
             label="Amount (£)"
@@ -588,7 +601,7 @@ const GroupDetail = () => {
             onChange={(e) => setAmount(e.target.value)}
             placeholder="Enter amount"
             min="0.01"
-            max={group.availableBalance}
+            max={group.userSavings}
             step="0.01"
             required
           />
@@ -634,6 +647,38 @@ const GroupDetail = () => {
               <p>You have £{group.availableBalance.toFixed(2)} available balance in this group. Consider withdrawing your funds before leaving.</p>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {isCreator && (
+        <div className="mt-8 border-t border-red-500/30 pt-6">
+          <h3 className="text-xl font-semibold text-red-500 mb-4">Danger Zone</h3>
+          <p className="text-gray-400 mb-4">
+            Deleting this group is a permanent action. All member balances will be refunded, and the group will be closed.
+          </p>
+          <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
+            Delete Group
+          </Button>
+        </div>
+      )}
+
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Confirm Group Deletion"
+      >
+        <p>Are you sure you want to delete this group? This action cannot be undone.</p>
+        <div className="flex justify-end gap-4 mt-6">
+          <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleDeleteGroup}
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Group'}
+          </Button>
         </div>
       </Modal>
     </div>

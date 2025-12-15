@@ -2,21 +2,9 @@
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://group-savings-app-production.up.railway.app" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "X-Requested-With, Content-Type, Authorization, Accept, Origin" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Max-Age", "value": "3600" }
-      ]
-    }
-  ],
   "env": {
-    "VITE_API_URL": "https://group-savings-app-production.up.railway.app/api"
+    "VITE_API_URL": "https://group-savings-app.onrender.com/api"
   },
-  "buildCommand": "VITE_API_URL=https://group-savings-app-production.up.railway.app/api vite build",
+  "buildCommand": "vite build",
   "framework": "vite"
 } 

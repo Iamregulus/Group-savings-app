@@ -23,6 +23,14 @@ migrate = Migrate()
 jwt = JWTManager()
 mail = Mail()
 
+def _get_database_uri():
+    """Return the database URI, normalizing Render/Heroku style postgres URLs."""
+    uri = os.environ.get('DATABASE_URI') or os.environ.get('DATABASE_URL')
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    return uri or 'sqlite:///group_savings.db'
+
+
 def create_app(test_config=None):
     # Create and configure the app
     app = Flask(__name__, instance_relative_config=True)
@@ -32,7 +40,7 @@ def create_app(test_config=None):
         # Load the config from environment variables
         app.config.from_mapping(
             SECRET_KEY=os.environ.get('SECRET_KEY', 'dev'),
-            SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URI', 'sqlite:///group_savings.db'),
+            SQLALCHEMY_DATABASE_URI=_get_database_uri(),
             SQLALCHEMY_TRACK_MODIFICATIONS=False,
             JWT_SECRET_KEY=os.environ.get('JWT_SECRET_KEY', 'dev'),
             JWT_ACCESS_TOKEN_EXPIRES=int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)),
@@ -67,23 +75,34 @@ def create_app(test_config=None):
     logger.info(f"Flask Environment: {flask_env}")
     logger.info(f"Railway Environment: {railway_env}")
     
-    # Define allowed origins
-    allowed_origins = [
-        "https://group-savings-app-mu.vercel.app",
-        "https://group-savings-app.vercel.app",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:5173"
-    ]
+    # Configure CORS for allowed origins (env override supported)
+    allowed_origins = os.environ.get('ALLOWED_ORIGINS')
+    if allowed_origins:
+        allowed_origins = [origin.strip() for origin in allowed_origins.split(',') if origin.strip()]
+    else:
+        allowed_origins = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "https://group-savings-app-mu.vercel.app",
+            "https://group-savings-app.vercel.app",
+            "https://group-savings-app.onrender.com"
+        ]
     
-    # Enable CORS with specific configuration
-    CORS(app, 
-         resources={r"/*": {"origins": allowed_origins}}, 
-         supports_credentials=True,
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
-         expose_headers=["Content-Type", "Authorization"])
+    # Include Render service URL automatically if available (useful for quick tests)
+    render_external_url = os.environ.get('RENDER_EXTERNAL_URL')
+    if render_external_url:
+        allowed_origins.append(render_external_url.rstrip('/'))
+
+    CORS(
+        app,
+        resources={r"/*": {"origins": allowed_origins}},
+        supports_credentials=True,
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
+        expose_headers=["Content-Type", "Authorization"],
+        max_age=3600
+    )
+    logger.info(f"Configured CORS for origins: {allowed_origins}")
     
     # Log CORS-related information
     @app.before_request
@@ -102,17 +121,6 @@ def create_app(test_config=None):
                 logger.info(f"{header}: {value}")
         
         return response
-
-    # Handle preflight OPTIONS requests
-    @app.before_request
-    def handle_preflight():
-        if request.method == "OPTIONS":
-            response = make_response()
-            response.headers.add("Access-Control-Allow-Origin", request.headers.get('Origin', '*'))
-            response.headers.add('Access-Control-Allow-Headers', "Content-Type, Authorization, Accept, X-Requested-With, Origin")
-            response.headers.add('Access-Control-Allow-Methods', "GET, POST, PUT, DELETE, OPTIONS")
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
-            return response
 
     # Health check endpoint
     @app.route('/health')
@@ -191,5 +199,8 @@ def create_app(test_config=None):
     
     from api.notifications import notifications_bp
     app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+
+    from api.admin import admin_bp
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
     return app

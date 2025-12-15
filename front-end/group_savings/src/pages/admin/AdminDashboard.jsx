@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { groupService } from '../../services/groupService';
 import { transactionService } from '../../services/transactionService';
+import api from '../../services/api'; // Import the main api service
 
 // Components
 import Card from '../../components/common/Card';
@@ -15,7 +16,6 @@ const AdminDashboard = () => {
     totalMembers: 0,
     totalSavings: 0,
     pendingWithdrawals: 0,
-    growthRate: '+8%'
   });
   const [recentGroups, setRecentGroups] = useState([]);
   const [error, setError] = useState(null);
@@ -24,32 +24,13 @@ const AdminDashboard = () => {
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        
-        // This would be replaced with actual API calls once the backend is implemented
-        // For now, using mock data
-        
-        // Mock data - replace with actual API calls
-        setTimeout(() => {
-          setStats({
-            totalGroups: 12,
-            totalMembers: 96,
-            totalSavings: 45000,
-            pendingWithdrawals: 3,
-            growthRate: '+8%'
-          });
-          
-          setRecentGroups([
-            { id: '1', name: 'Family Savings', memberCount: 4, totalSaved: 12000, createdAt: new Date('2023-01-15') },
-            { id: '2', name: 'Office Team Fund', memberCount: 8, totalSaved: 8500, createdAt: new Date('2023-02-22') },
-            { id: '3', name: 'Holiday Savings', memberCount: 6, totalSaved: 5000, createdAt: new Date('2023-03-10') },
-          ]);
-          
-          setLoading(false);
-        }, 1000);
-        
+        const response = await api.get('/admin/stats');
+        setStats(response.stats);
+        setRecentGroups(response.recentGroups);
       } catch (error) {
         console.error('Error fetching admin data:', error);
-        setError('Failed to load dashboard data');
+        setError('Failed to load dashboard data. You may not have permission to view this page.');
+      } finally {
         setLoading(false);
       }
     };
@@ -89,119 +70,6 @@ const AdminDashboard = () => {
             <Button variant="outline">Withdrawal Requests</Button>
           </Link>
         </div>
-      </div>
-      
-      {/* Analytics Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Group Growth Card */}
-        <Card className="p-6">
-          <h3 className="font-medium mb-2">Group Growth</h3>
-          <p className="text-gray-500 text-sm mb-4">Last Quarter Performance</p>
-          
-          {/* Bar Chart Visualization */}
-          <div className="h-48 flex items-end space-x-4 mb-2">
-            <div className="bg-indigo-500 w-8 h-20 rounded"></div>
-            <div className="bg-indigo-500 w-8 h-28 rounded"></div>
-            <div className="bg-indigo-500 w-8 h-24 rounded"></div>
-            <div className="bg-indigo-500 w-8 h-32 rounded"></div>
-            <div className="bg-indigo-500 w-8 h-36 rounded"></div>
-            <div className="bg-indigo-500 w-8 h-40 rounded"></div>
-            <div className="bg-indigo-500 w-8 h-44 rounded"></div>
-          </div>
-          
-          <div className="text-xs text-gray-500 flex justify-between">
-            <span>Jan</span>
-            <span>Feb</span>
-            <span>Mar</span>
-            <span>Apr</span>
-            <span>May</span>
-            <span>Jun</span>
-            <span>Jul</span>
-          </div>
-          
-          <div className="mt-4 text-sm text-gray-500">
-            <span className="flex items-center">
-              <span className="w-3 h-3 inline-block rounded-full bg-gray-300 mr-2"></span>
-              updated 2 days ago
-            </span>
-          </div>
-        </Card>
-        
-        {/* Member Growth Card */}
-        <Card className="p-6">
-          <h3 className="font-medium mb-2">Member Growth</h3>
-          <p className="text-gray-500 text-sm mb-4">(+15%) increase in new members</p>
-          
-          {/* Line Chart Visualization */}
-          <div className="h-48 relative mb-2">
-            <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-              <polyline
-                points="0,80 50,75 100,60 150,40 200,30 250,20 300,10"
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="3"
-              />
-            </svg>
-          </div>
-          
-          <div className="text-xs text-gray-500 flex justify-between">
-            <span>Feb</span>
-            <span>Mar</span>
-            <span>Apr</span>
-            <span>May</span>
-            <span>Jun</span>
-          </div>
-          
-          <div className="mt-4 text-sm text-gray-500">
-            <span className="flex items-center">
-              <span className="w-3 h-3 inline-block rounded-full bg-gray-300 mr-2"></span>
-              updated 4 min ago
-            </span>
-          </div>
-        </Card>
-        
-        {/* Total Savings Growth Card */}
-        <Card className="p-6">
-          <h3 className="font-medium mb-2">Total Savings Growth</h3>
-          <p className="text-gray-500 text-sm mb-4">Monthly Progress</p>
-          
-          {/* Area Chart Visualization */}
-          <div className="h-48 relative mb-2">
-            <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
-                </linearGradient>
-              </defs>
-              <polyline
-                points="0,90 50,70 100,50 150,40 200,20 250,25 300,10"
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="3"
-              />
-              <polygon
-                points="0,90 50,70 100,50 150,40 200,20 250,25 300,10 300,100 0,100"
-                fill="url(#gradient)"
-              />
-            </svg>
-          </div>
-          
-          <div className="text-xs text-gray-500 flex justify-between">
-            <span>Feb</span>
-            <span>Mar</span>
-            <span>Apr</span>
-            <span>May</span>
-            <span>Jun</span>
-          </div>
-          
-          <div className="mt-4 text-sm text-gray-500">
-            <span className="flex items-center">
-              <span className="w-3 h-3 inline-block rounded-full bg-gray-300 mr-2"></span>
-              just updated
-            </span>
-          </div>
-        </Card>
       </div>
       
       {/* Stats Cards Row */}
@@ -249,37 +117,37 @@ const AdminDashboard = () => {
           </div>
           <div className="bg-indigo-600 p-3 rounded">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
           </div>
         </Card>
       </div>
-      
+
       {/* Recent Groups */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Recent Groups</h2>
-        <Card>
-          <div className="divide-y">
-            {recentGroups.map(group => (
-              <div key={group.id} className="p-4 flex justify-between items-center">
-                <div>
-                  <p className="font-medium">{group.name}</p>
-                  <p className="text-sm text-gray-500">Members: {group.memberCount} · Total: £{group.totalSaved.toLocaleString()}</p>
+      <Card>
+        <div className="p-6">
+          <h2 className="text-xl font-bold mb-4">Recent Groups</h2>
+          <div className="space-y-4">
+            {recentGroups.length > 0 ? (
+              recentGroups.map(group => (
+                <div key={group.id} className="flex items-center justify-between p-4 bg-purple-600 rounded">
+                  <div>
+                    <p className="font-bold">{group.name}</p>
+                    <p className="text-sm text-black">
+                      Members: {group.member_count} - Total: £{group.current_amount?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                  <Link to={`/groups/${group.id}`}>
+                    <Button variant="outline">View</Button>
+                  </Link>
                 </div>
-                <Link to={`/group/${group.id}`}>
-                  <Button size="small" variant="outline">View</Button>
-                </Link>
-              </div>
-            ))}
-            
-            {recentGroups.length === 0 && (
-              <div className="p-6 text-center text-gray-500">
-                No groups created yet
-              </div>
+              ))
+            ) : (
+              <p>No recent groups found.</p>
             )}
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.user import User
-from models.group import GroupMember
+from models.group import GroupMember, Group
 from models.transaction import Transaction
 from app import db
 
@@ -146,4 +146,31 @@ def get_user_transaction_summary(user_id):
             'currentBalance': current_balance
         },
         'groups': user_groups
-    }), 200 
+    }), 200
+
+@users_bp.route('/dashboard-stats', methods=['GET'])
+@jwt_required()
+def get_dashboard_stats():
+    user_id = get_jwt_identity()
+    print(f"Fetching dashboard stats for user: {user_id}")
+    
+    # Quick Stats
+    total_contributions = db.session.query(db.func.sum(Transaction.amount)).filter(Transaction.user_id == user_id, Transaction.transaction_type == 'contribution').scalar() or 0
+    total_groups = Group.query.filter_by(creator_id=user_id).count()
+    
+    # Mock data for other stats until they are implemented
+    total_savings = total_contributions  # Placeholder
+    growth = 0  # Placeholder
+
+    # Recent Transactions
+    recent_transactions = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.created_at.desc()).limit(5).all()
+
+    return jsonify({
+        'quick_stats': {
+            'contributions': total_contributions,
+            'groups': total_groups,
+            'total_savings': total_savings,
+            'growth': growth
+        },
+        'recent_transactions': [t.to_dict() for t in recent_transactions]
+    }) 
