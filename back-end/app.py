@@ -98,7 +98,15 @@ def create_app(test_config=None):
         resources={r"/*": {"origins": allowed_origins}},
         supports_credentials=True,
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "Accept",
+            "X-Requested-With",
+            "Origin",
+            "Cache-Control",
+            "Pragma"
+        ],
         expose_headers=["Content-Type", "Authorization"],
         max_age=3600
     )
