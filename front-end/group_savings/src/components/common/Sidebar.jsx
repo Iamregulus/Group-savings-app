@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 
-const Sidebar = ({ isOpen }) => {
+const Sidebar = ({ isOpen, onNavigate, onClose }) => {
   const location = useLocation();
   const { currentUser, logout } = useAuth();
 
@@ -26,12 +26,25 @@ const Sidebar = ({ isOpen }) => {
     logout();
   };
 
+  const handleNavClick = () => {
+    if (onNavigate) onNavigate();
+  };
+
   return (
     <aside className={sidebarClasses}>
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col relative">
         <div className="p-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">SaverCircle</h1>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button 
+              className="sidebar-close"
+              onClick={onClose}
+              aria-label="Close menu"
+            >
+              <span className="material-icons">close</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col flex-grow">
@@ -44,22 +57,22 @@ const Sidebar = ({ isOpen }) => {
           )}
 
           <nav className="flex-grow space-y-1 px-2">
-            <Link to="/dashboard" className={navItemClasses(isActive('/dashboard'))}>
+            <Link to="/dashboard" onClick={handleNavClick} className={navItemClasses(isActive('/dashboard'))}>
               <span className="material-icons mr-3">dashboard</span>
               Dashboard
             </Link>
 
-            <Link to="/create-group" className={navItemClasses(isActive('/create-group'))}>
+            <Link to="/create-group" onClick={handleNavClick} className={navItemClasses(isActive('/create-group'))}>
               <span className="material-icons mr-3">group_add</span>
               Create Group
             </Link>
 
-            <Link to="/profile" className={navItemClasses(isActive('/profile'))}>
+            <Link to="/profile" onClick={handleNavClick} className={navItemClasses(isActive('/profile'))}>
               <span className="material-icons mr-3">person</span>
               Profile
             </Link>
 
-            <Link to="/notifications" className={navItemClasses(isActive('/notifications'))}>
+            <Link to="/notifications" onClick={handleNavClick} className={navItemClasses(isActive('/notifications'))}>
               <span className="material-icons mr-3">notifications</span>
               Notifications
             </Link>
