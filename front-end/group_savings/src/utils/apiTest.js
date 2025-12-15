@@ -1,37 +1,21 @@
 import axios from 'axios';
 
-// Mobile check
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-  typeof navigator !== 'undefined' ? navigator.userAgent : ''
-);
-
 /**
  * Utility function to test API connectivity
  * This can be imported and used in the browser console for debugging
  */
 export const testApiConnection = async () => {
-  // Determine if we're in production based on the URL
-  const isProduction = window.location.protocol === 'https:' || 
-                       window.location.hostname.includes('vercel.app');
-  
-  const apiUrl = isProduction 
-    ? 'https://group-savings-app-production.up.railway.app/api'
-    : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
-  
-  const rootUrl = isProduction
-    ? 'https://group-savings-app-production.up.railway.app'
-    : 'http://localhost:5000';
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const rootUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
   
   console.log('Testing API connection...');
-  console.log('Environment:', isProduction ? 'Production' : 'Development');
-  console.log('Device type:', isMobile ? 'Mobile' : 'Desktop');
+  console.log('Environment: Development');
   console.log('Root URL:', rootUrl);
   console.log('API URL:', apiUrl);
   
   // Test results
   const results = {
-    environment: isProduction ? 'production' : 'development',
-    deviceType: isMobile ? 'mobile' : 'desktop',
+    environment: 'development',
     timestamp: new Date().toISOString(),
     browserInfo: navigator.userAgent,
     root: null,
@@ -43,7 +27,7 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing root endpoint:', rootUrl);
     const rootResponse = await axios.get(rootUrl, { 
-      timeout: isMobile ? 45000 : 30000,
+      timeout: 30000,
       headers: { 
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -79,7 +63,7 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing API endpoint:', apiUrl);
     const apiResponse = await axios.get(`${apiUrl}`, { 
-      timeout: isMobile ? 45000 : 30000,
+      timeout: 30000,
       headers: { 
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -115,7 +99,7 @@ export const testApiConnection = async () => {
   try {
     console.log('Testing auth health endpoint:', `${apiUrl}/auth`);
     const authResponse = await axios.get(`${apiUrl}/auth`, { 
-      timeout: isMobile ? 45000 : 30000,
+      timeout: 30000,
       headers: { 
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -163,16 +147,8 @@ export const testApiConnection = async () => {
     if (!results.root.success && !results.api.success) {
       console.log('- Check if the backend server is running at', rootUrl);
       console.log('- Verify your internet connection');
-      
-      if (isMobile) {
-        console.log('- Mobile-specific troubleshooting:');
-        console.log('  * Try switching from cellular data to WiFi or vice versa');
-        console.log('  * Check if your mobile carrier restricts certain connections');
-        console.log('  * Disable any VPN or proxy services you may be using');
-      } else {
-        console.log('- Check for CORS issues - the browser might be blocking cross-origin requests');
-        console.log('- Try disabling any browser extensions that might be interfering with network requests');
-      }
+      console.log('- Check for CORS issues - the browser might be blocking cross-origin requests');
+      console.log('- Try disabling any browser extensions that might be interfering with network requests');
     } else if (results.root.success && !results.api.success) {
       console.log('- The server is reachable but the API endpoints are not accessible');
       console.log('- Check if the API routes are configured correctly on the backend');
@@ -198,38 +174,26 @@ export const runNetworkDiagnostics = async () => {
   };
   
   // Network information if available
-  const networkInfo = navigator.connection ? {
-    effectiveType: navigator.connection.effectiveType,
-    downlink: navigator.connection.downlink,
-    rtt: navigator.connection.rtt,
-    saveData: navigator.connection.saveData
-  } : 'Not available';
-  
-  // Compile results
-  const diagnosticsResults = {
-    timestamp: new Date().toISOString(),
-    url: window.location.href,
-    apiTests: apiTestResults,
-    browser: {
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      cookiesEnabled: navigator.cookieEnabled,
-      doNotTrack: navigator.doNotTrack,
-      onLine: navigator.onLine
-    },
-    localStorage: localStorageItems,
-    networkInfo
+  const networkInfo = {
+    online: navigator.onLine ? '✅ Online' : '❌ Offline',
+    connectionType: navigator.connection ? navigator.connection.effectiveType : 'Unknown',
+    downlink: navigator.connection ? navigator.connection.downlink : 'Unknown'
   };
   
-  console.log('Complete Diagnostics Results:', diagnosticsResults);
+  console.log('📊 Diagnostic Summary:');
+  console.log('Network Status:', networkInfo);
+  console.log('Local Storage:', localStorageItems);
+  console.log('API Test Results:', apiTestResults);
   
-  return diagnosticsResults;
+  return {
+    networkInfo,
+    localStorageItems,
+    apiTestResults
+  };
 };
 
-// Make these functions available in the browser console for easy debugging
+// Make functions available globally for console debugging
 if (typeof window !== 'undefined') {
   window.testApiConnection = testApiConnection;
   window.runNetworkDiagnostics = runNetworkDiagnostics;
-}
-
-export default { testApiConnection, runNetworkDiagnostics }; 
+} 

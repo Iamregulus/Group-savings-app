@@ -41,7 +41,7 @@ export const notificationService = {
   async getUnreadCount() {
     try {
       const response = await this.getNotifications({ limit: 1, unreadOnly: true });
-      return response.data.meta.unreadCount || 0;
+      return response.meta?.unreadCount || 0;
     } catch (error) {
       // If we get an authentication error, return 0 instead of propagating the error
       if (error.status === 401) {

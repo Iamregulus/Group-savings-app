@@ -19,21 +19,12 @@ export const transactionService = {
   },
 
   // Get all transactions for a group
-  async getGroupTransactions(groupId, options = {}) {
+  async getGroupTransactions(groupId) {
     try {
-      const params = new URLSearchParams();
-      if (options.limit) params.append('limit', options.limit);
-      if (options.offset) params.append('offset', options.offset);
-      if (options.type) params.append('type', options.type);
-      if (options.startDate) params.append('startDate', options.startDate);
-      if (options.endDate) params.append('endDate', options.endDate);
-      if (options.userId) params.append('userId', options.userId);
-      
-      const queryString = params.toString() ? `?${params.toString()}` : '';
-      
-      // Use the correct endpoint
-      return await api.get(`/transactions/group/${groupId}${queryString}`);
+      const response = await api.get(`/groups/${groupId}/transactions`);
+      return response;
     } catch (error) {
+      console.error(`Error fetching transactions for group ${groupId}:`, error);
       throw error;
     }
   },

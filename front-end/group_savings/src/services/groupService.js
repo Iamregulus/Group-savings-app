@@ -161,13 +161,10 @@ const groupService = {
   },
 
   // Request a withdrawal from a group
-  async requestWithdrawal(groupId, amount, reason) {
+  async requestWithdrawal(groupId, withdrawalData) {
     try {
       console.log(`🔍 Calling API: POST /groups/${groupId}/withdrawals`);
-      const response = await api.post(`/groups/${groupId}/withdrawals`, {
-        amount,
-        reason
-      });
+      const response = await api.post(`/groups/${groupId}/withdrawals`, withdrawalData);
       console.log("📊 API Response from requestWithdrawal:", response);
       return response;
     } catch (error) {
@@ -230,14 +227,23 @@ const groupService = {
   },
 
   // Admin: Approve or reject a withdrawal request
-  async processWithdrawalRequest(groupId, requestId, action, remarks) {
+  async processWithdrawalRequest(groupId, transactionId, action, remarks) {
     try {
-      const response = await api.put(`/groups/${groupId}/withdrawals/${requestId}`, { 
-        status: action, 
-        remarks 
+      return await api.put(`/groups/${groupId}/withdrawals/${transactionId}`, {
+        status: action,
+        remarks: remarks
       });
-      return response.data || {};
     } catch (error) {
+      console.error(`Error processing withdrawal request ${transactionId}:`, error);
+      throw error;
+    }
+  },
+
+  async deleteGroup(groupId) {
+    try {
+      return await api.delete(`/groups/${groupId}`);
+    } catch (error) {
+      console.error(`Error deleting group ${groupId}:`, error);
       throw error;
     }
   }

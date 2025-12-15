@@ -1,73 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
+import axios from 'axios';
 
 const OfflineModeHandler = () => {
   const [showMessage, setShowMessage] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('checking');
-  const [demoModeActive, setDemoModeActive] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [message, setMessage] = useState('Checking connection status...');
+
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
     // Check connection status on mount
     checkConnectionStatus();
 
-    // Listen for offline mode events
-    const handleOfflineEvent = (event) => {
-      setShowMessage(true);
-      setConnectionStatus('offline');
-      setMessage(`Network error: ${event.detail.message}`);
-    };
-
-    window.addEventListener('api:offline', handleOfflineEvent);
-
     // Check connection periodically
     const intervalId = setInterval(() => {
-      if (!isRetrying && !demoModeActive) {
+      if (!isRetrying) {
         checkConnectionStatus();
       }
     }, 30000);
 
     return () => {
-      window.removeEventListener('api:offline', handleOfflineEvent);
       clearInterval(intervalId);
     };
-  }, [isRetrying, demoModeActive]);
+  }, [isRetrying]);
 
   const checkConnectionStatus = async () => {
     try {
-      const status = await api.getConnectionStatus();
+      const response = await axios.get(`${apiUrl}`, {
+        timeout: 30000,
+        headers: { 
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
       
-      if (status.status === 'online') {
+      if (response.status === 200) {
         setConnectionStatus('online');
         setShowMessage(false);
-      } else if (status.status === 'offline') {
-        setConnectionStatus('offline');
-        setDemoModeActive(true);
-        setShowMessage(true);
-        setMessage('Using offline demo mode with cached data.');
       } else {
         setConnectionStatus('error');
         setShowMessage(true);
-        setMessage('Unable to connect to the server. Would you like to try demo mode?');
+        setMessage('Server returned an unexpected response.');
       }
     } catch (error) {
       setConnectionStatus('error');
       setShowMessage(true);
-      setMessage('Error checking connection status. Network may be unavailable.');
-    }
-  };
-
-  const enableDemoMode = async () => {
-    try {
-      await api.enableOfflineMode();
-      setDemoModeActive(true);
-      setConnectionStatus('offline');
-      setMessage('Demo mode activated. Using sample data.');
-      // Reload the page to apply changes
-      window.location.reload();
-    } catch (error) {
-      setMessage(`Error enabling demo mode: ${error.message}`);
+      setMessage('Unable to connect to the server. Please check if the backend is running.');
     }
   };
 
@@ -76,29 +55,9 @@ const OfflineModeHandler = () => {
     setMessage('Trying to reconnect...');
     
     try {
-      const status = await api.getConnectionStatus();
-      
-      if (status.status === 'online') {
-        if (demoModeActive) {
-          const result = await api.disableOfflineMode();
-          if (result.status === 'success') {
-            setDemoModeActive(false);
-            setConnectionStatus('online');
-            setShowMessage(false);
-            // Reload the page to apply changes
-            window.location.reload();
-          } else {
-            setMessage('Could not disable demo mode: No backend available');
-          }
-        } else {
-          setConnectionStatus('online');
-          setShowMessage(false);
-        }
-      } else {
-        setMessage('Still unable to connect to any backend server.');
-      }
+      await checkConnectionStatus();
     } catch (error) {
-      setMessage(`Error during reconnection: ${error.message}`);
+      setMessage('Still unable to connect to the server.');
     } finally {
       setIsRetrying(false);
     }
@@ -116,8 +75,7 @@ const OfflineModeHandler = () => {
       bottom: '20px',
       left: '50%',
       transform: 'translateX(-50%)',
-      backgroundColor: connectionStatus === 'online' ? '#4caf50' : 
-                      connectionStatus === 'offline' ? '#ff9800' : '#f44336',
+      backgroundColor: connectionStatus === 'online' ? '#4caf50' : '#f44336',
       color: 'white',
       padding: '15px 20px',
       borderRadius: '8px',
@@ -131,29 +89,11 @@ const OfflineModeHandler = () => {
       width: 'auto'
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-        {connectionStatus === 'online' ? '🟢 Connected' : 
-         connectionStatus === 'offline' ? '🟠 Offline Mode' : '🔴 Connection Error'}
+        {connectionStatus === 'online' ? '🟢 Connected' : '🔴 Connection Error'}
       </div>
       <span>{message}</span>
       
       <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-        {connectionStatus === 'error' && !demoModeActive && (
-          <button 
-            onClick={enableDemoMode}
-            style={{
-              background: '#9c27b0',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              padding: '8px 16px',
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-          >
-            Try Demo Mode
-          </button>
-        )}
-        
         <button 
           onClick={tryReconnect}
           disabled={isRetrying}

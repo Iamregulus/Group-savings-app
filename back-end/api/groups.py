@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models.group import Group, GroupMember
 from models.user import User
 from models.transaction import Transaction
@@ -202,6 +202,22 @@ def get_group(group_id):
     
     return jsonify(group_dict), 200
 
+# Get all transactions for a group
+@groups_bp.route('/<group_id>/transactions', methods=['GET'])
+@jwt_required()
+def get_group_transactions(group_id):
+    user_id = get_jwt_identity()
+    
+    # Check if the user is a member of the group
+    membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id).first()
+    if not membership:
+        return jsonify(message="You are not authorized to view these transactions"), 403
+        
+    # Get all transactions for the group
+    transactions = Transaction.query.filter_by(group_id=group_id).order_by(Transaction.created_at.desc()).all()
+    
+    return jsonify([t.to_dict() for t in transactions]), 200
+
 # Create a new group
 @groups_bp.route('', methods=['POST'])
 @groups_bp.route('/', methods=['POST'])
@@ -248,23 +264,20 @@ def create_group():
         # Save to database
         print("About to add group to db.session")
         db.session.add(group)
-        print("About to commit group to database")
-        db.session.commit()
-        print("Group committed successfully, ID:", group.id)
+        db.session.flush()
         
-        # Add the creator as an admin member
-        print("Creating admin membership for user:", user_id)
-        member = GroupMember(
+        # Add the creator as the first member and admin
+        membership = GroupMember(
             group_id=group.id,
             user_id=user_id,
-            role='admin'
+            role='admin',
+            is_active=True
         )
+        db.session.add(membership)
         
-        print("About to add member to db.session")
-        db.session.add(member)
-        print("About to commit member to database")
         db.session.commit()
-        print("Member committed successfully")
+        
+        print(f"Group created successfully: {group.id}")
         
         # Return group data with proper id
         group_data = group.to_dict()
@@ -345,6 +358,71 @@ def update_group(group_id):
         'message': 'Group updated successfully',
         'group': group.to_dict()
     }), 200
+
+# Delete a group
+@groups_bp.route('/<group_id>', methods=['DELETE'])
+@jwt_required()
+def delete_group(group_id):
+    user_id = get_jwt_identity()
+
+    # Get the group
+    group = Group.query.get(group_id)
+    if not group:
+        return jsonify({'message': 'Group not found'}), 404
+
+    # Only the group creator can delete the group
+    if group.creator_id != user_id:
+        return jsonify({'message': 'You do not have permission to delete this group'}), 403
+
+    try:
+        # Get all active members
+        members = GroupMember.query.filter_by(group_id=group_id, is_active=True).all()
+
+        # For each member, calculate balance and issue a refund transaction
+        for member in members:
+            # Calculate user's personal available balance
+            user_contributions = db.session.query(db.func.sum(Transaction.amount)).filter_by(
+                user_id=member.user_id,
+                group_id=group_id,
+                transaction_type='contribution',
+                status='completed'
+            ).scalar() or 0
+
+            user_withdrawals = db.session.query(db.func.sum(Transaction.amount)).filter_by(
+                user_id=member.user_id,
+                group_id=group_id,
+                transaction_type='withdrawal',
+                status='completed'
+            ).scalar() or 0
+
+            user_balance = user_contributions - user_withdrawals
+
+            if user_balance > 0:
+                refund_transaction = Transaction(
+                    user_id=member.user_id,
+                    group_id=group_id,
+                    amount=user_balance,
+                    transaction_type='withdrawal',
+                    status='completed', # Mark as completed since it's a refund
+                    description=f"Refund from deletion of group '{group.name}'.",
+                    processed_at=datetime.datetime.utcnow()
+                )
+                db.session.add(refund_transaction)
+
+        # Deactivate all memberships
+        GroupMember.query.filter_by(group_id=group_id).update({'is_active': False})
+
+        # Mark the group as 'cancelled'
+        group.status = 'cancelled'
+        
+        db.session.commit()
+
+        return jsonify({'message': 'Group deleted successfully and funds have been returned to members.'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting group {group_id}: {str(e)}")
+        return jsonify({'message': 'An error occurred while deleting the group.'}), 500
 
 # Join a group
 @groups_bp.route('/<group_id>/join', methods=['POST'])
@@ -577,30 +655,32 @@ def request_withdrawal(group_id):
         return jsonify({'message': 'Group not found'}), 404
     
     # Check if required fields are present
-    if 'amount' not in data:
+    if not data or 'amount' not in data:
         return jsonify({'message': 'Amount is required'}), 400
     
-    # Calculate available balance
-    total_contributions = Transaction.query.filter_by(
+    # Calculate user's personal available balance
+    user_contributions = db.session.query(db.func.sum(Transaction.amount)).filter_by(
+        user_id=user_id,
         group_id=group_id,
         transaction_type='contribution',
         status='completed'
-    ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+    ).scalar() or 0
     
-    total_withdrawals = Transaction.query.filter_by(
+    user_withdrawals = db.session.query(db.func.sum(Transaction.amount)).filter_by(
+        user_id=user_id,
         group_id=group_id,
         transaction_type='withdrawal',
         status='completed'
-    ).with_entities(db.func.sum(Transaction.amount)).scalar() or 0
+    ).scalar() or 0
     
-    available_balance = total_contributions - total_withdrawals
-    
-    # Check if withdrawal amount is valid
+    user_balance = user_contributions - user_withdrawals
+
+    # Check if withdrawal amount is valid against user's balance
     if float(data['amount']) <= 0:
         return jsonify({'message': 'Withdrawal amount must be greater than zero'}), 400
     
-    if float(data['amount']) > available_balance:
-        return jsonify({'message': 'Insufficient balance for withdrawal'}), 400
+    if float(data['amount']) > user_balance:
+        return jsonify({'message': 'Withdrawal amount exceeds your available balance'}), 400
     
     # Create new transaction
     transaction = Transaction(
@@ -621,19 +701,25 @@ def request_withdrawal(group_id):
     
     # Find all admins of the group
     admin_members = GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).all()
+    admin_ids = {member.user_id for member in admin_members}
+    
+    # Ensure the group creator is always notified
+    if group.creator_id:
+        admin_ids.add(group.creator_id)
+        
     from models.notification import Notification
     
-    # Create notifications for all admins
-    for admin_member in admin_members:
-        # Skip if it's the same user (though unlikely an admin would request approval from themselves)
-        if admin_member.user_id == user_id:
+    # Create notifications for all admins and the creator
+    for recipient_id in admin_ids:
+        # Skip sending notification to the user who made the request
+        if recipient_id == user_id:
             continue
             
         # Create notification
         notification = Notification(
-            recipient_id=admin_member.user_id,
+            recipient_id=recipient_id,
             transaction_id=transaction.id,
-            message=f"{requester_name} has requested a withdrawal of ${data['amount']} from group '{group.name}'. Please review.",
+            message=f"{requester_name} has requested a withdrawal of £{data['amount']} from group '{group.name}'. Please review.",
             notification_type="withdrawal_request",
             is_read=False
         )
@@ -659,7 +745,7 @@ def request_withdrawal(group_id):
                     body=f"""
                     Hello {admin.first_name},
 
-                    {requester_name} has requested a withdrawal of ${data['amount']} from group '{group.name}'.
+                    {requester_name} has requested a withdrawal of £{data['amount']} from group '{group.name}'.
                     
                     Please log in to the platform to review and process this request.
 
@@ -689,13 +775,9 @@ def process_withdrawal(group_id, transaction_id):
     if not group:
         return jsonify({'message': 'Group not found'}), 404
     
-    # Check if user is an admin of the group or the group creator
-    membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id, role='admin', is_active=True).first()
-    if not membership:
-        return jsonify({'message': 'You do not have permission to process withdrawal requests'}), 403
-    
-    # Additional check if the user is the group creator for extra security
-    is_creator = group.creator_id == user_id
+    # Only the group creator can process withdrawal requests
+    if group.creator_id != user_id:
+        return jsonify({'message': 'You do not have permission to manage withdrawal requests for this group'}), 403
     
     # Get the transaction
     transaction = Transaction.query.get(transaction_id)
@@ -730,9 +812,9 @@ def process_withdrawal(group_id, transaction_id):
     
     # Prepare notification message
     if action == 'completed':
-        message = f"Your withdrawal request for ${transaction.amount} has been approved by {admin.first_name} {admin.last_name}."
+        message = f"Your withdrawal request for £{transaction.amount} has been approved by {admin.first_name} {admin.last_name}."
     else:  # rejected
-        message = f"Your withdrawal request for ${transaction.amount} has been rejected by {admin.first_name} {admin.last_name}."
+        message = f"Your withdrawal request for £{transaction.amount} has been rejected by {admin.first_name} {admin.last_name}."
         if transaction.remarks:
             message += f" Reason: {transaction.remarks}"
     
@@ -779,7 +861,7 @@ def process_withdrawal(group_id, transaction_id):
         'processedBy': {
             'id': admin.id,
             'name': f"{admin.first_name} {admin.last_name}",
-            'isCreator': is_creator
+            'isCreator': True
         }
     }), 200
 
