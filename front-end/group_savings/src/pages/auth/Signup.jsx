@@ -87,11 +87,11 @@ const Signup = () => {
       
       // Match the data structure expected by the backend
       const userData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        phoneNumber: formData.phoneNumber
+        phoneNumber: formData.phoneNumber.trim()
       };
       
       const userRole = await signup(userData);
