@@ -19,6 +19,7 @@ const MainLayout = ({ children }) => {
         <button className="menu-button" onClick={openSidebar} aria-label="Open menu">
           <span className="material-icons">menu</span>
         </button>
+        <div className="mobile-title">SaverCircle</div>
         <div className="mobile-actions">
           <NotificationDropdown />
         </div>
