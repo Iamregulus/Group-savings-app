@@ -6,7 +6,7 @@ services:
     startCommand: cd back-end && python db_init.py && gunicorn -b 0.0.0.0:$PORT run:app --log-level info --timeout 120 --workers 1 --worker-class sync
     envVars:
       - key: DATABASE_URL
-        value: postgresql://savings_app_database_user:REDACTED-ROTATE-THIS-PASSWORD@dpg-d16hucvdiees73d5rs10-a.frankfurt-postgres.render.com/savings_app_database
+        sync: false # set in the Render dashboard, not committed here
       - key: FLASK_ENV
         value: production
       - key: FLASK_DEBUG
