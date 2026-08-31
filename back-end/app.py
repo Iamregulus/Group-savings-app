@@ -1,7 +1,9 @@
 import os
 import logging
 import sys
+from decimal import Decimal
 from flask import Flask, make_response, request, jsonify
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_sqlalchemy import SQLAlchemy
@@ -23,6 +25,17 @@ migrate = Migrate()
 jwt = JWTManager()
 mail = Mail()
 
+
+class DecimalJSONProvider(DefaultJSONProvider):
+    """Money fields are stored as Decimal (db.Numeric); serialize them as
+    plain numbers for JSON clients, which have no Decimal type."""
+
+    @staticmethod
+    def default(o):
+        if isinstance(o, Decimal):
+            return float(o)
+        return DefaultJSONProvider.default(o)
+
 def _get_database_uri():
     """Return the database URI, normalizing Render/Heroku style postgres URLs."""
     uri = os.environ.get('DATABASE_URI') or os.environ.get('DATABASE_URL')
@@ -34,7 +47,8 @@ def _get_database_uri():
 def create_app(test_config=None):
     # Create and configure the app
     app = Flask(__name__, instance_relative_config=True)
-    
+    app.json = DecimalJSONProvider(app)
+
     # Configure the app
     if test_config is None:
         # Load the config from environment variables

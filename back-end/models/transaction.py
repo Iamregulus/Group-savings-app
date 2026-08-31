@@ -8,7 +8,7 @@ class Transaction(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     group_id = db.Column(db.String(36), db.ForeignKey('groups.id'), nullable=False)
-    amount = db.Column(db.Float, nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
     transaction_type = db.Column(db.String(20), nullable=False)  # 'contribution', 'withdrawal'
     status = db.Column(db.String(20), default='pending')  # 'pending', 'completed', 'cancelled', 'rejected'
     payment_method = db.Column(db.String(50), nullable=True)

@@ -8,8 +8,8 @@ class Group(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    target_amount = db.Column(db.Float, nullable=False)
-    contribution_amount = db.Column(db.Float, nullable=False)
+    target_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    contribution_amount = db.Column(db.Numeric(10, 2), nullable=False)
     contribution_frequency = db.Column(db.String(20), nullable=False)  # 'daily', 'weekly', 'monthly'
     max_members = db.Column(db.Integer, nullable=False)
     is_public = db.Column(db.Boolean, default=True)

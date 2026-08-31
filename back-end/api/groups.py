@@ -4,9 +4,16 @@ from models.group import Group, GroupMember
 from models.user import User
 from models.transaction import Transaction
 from app import db
+from decimal import Decimal
 import random
 import string
 import datetime
+
+
+def parse_amount(value):
+    """Parse a JSON-supplied amount into a Decimal without going through
+    float, so it doesn't inherit binary floating-point rounding error."""
+    return Decimal(str(value))
 
 groups_bp = Blueprint('groups', __name__)
 
@@ -248,8 +255,8 @@ def create_group():
         group = Group(
             name=data['name'],
             description=data.get('description', ''),
-            target_amount=float(data['targetAmount']),
-            contribution_amount=float(data['contributionAmount']),
+            target_amount=parse_amount(data['targetAmount']),
+            contribution_amount=parse_amount(data['contributionAmount']),
             contribution_frequency=data['contributionFrequency'],
             max_members=int(data['maxMembers']),
             is_public=data.get('isPublic', True),
@@ -332,9 +339,9 @@ def update_group(group_id):
     if 'description' in data:
         group.description = data['description']
     if 'targetAmount' in data:
-        group.target_amount = float(data['targetAmount'])
+        group.target_amount = parse_amount(data['targetAmount'])
     if 'contributionAmount' in data:
-        group.contribution_amount = float(data['contributionAmount'])
+        group.contribution_amount = parse_amount(data['contributionAmount'])
     if 'contributionFrequency' in data:
         group.contribution_frequency = data['contributionFrequency']
     if 'maxMembers' in data:
@@ -616,7 +623,7 @@ def make_contribution(group_id):
     transaction = Transaction(
         user_id=user_id,
         group_id=group_id,
-        amount=float(data['amount']),
+        amount=parse_amount(data['amount']),
         transaction_type='contribution',
         status='completed',  # For simplicity, mark as completed immediately (could be 'pending' in real app)
         payment_method=data['paymentMethod'],
@@ -676,17 +683,18 @@ def request_withdrawal(group_id):
     user_balance = user_contributions - user_withdrawals
 
     # Check if withdrawal amount is valid against user's balance
-    if float(data['amount']) <= 0:
+    withdrawal_amount = parse_amount(data['amount'])
+    if withdrawal_amount <= 0:
         return jsonify({'message': 'Withdrawal amount must be greater than zero'}), 400
-    
-    if float(data['amount']) > user_balance:
+
+    if withdrawal_amount > user_balance:
         return jsonify({'message': 'Withdrawal amount exceeds your available balance'}), 400
-    
+
     # Create new transaction
     transaction = Transaction(
         user_id=user_id,
         group_id=group_id,
-        amount=float(data['amount']),
+        amount=withdrawal_amount,
         transaction_type='withdrawal',
         status='pending',  # Withdrawal requests start as pending
         description=data.get('description', 'Withdrawal request')
