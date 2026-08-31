@@ -15,6 +15,7 @@ class Group(db.Model):
     is_public = db.Column(db.Boolean, default=True)
     join_code = db.Column(db.String(20), nullable=True)
     status = db.Column(db.String(20), default='active')  # 'active', 'completed', 'cancelled'
+    is_flagged = db.Column(db.Boolean, nullable=False, default=False)  # manual super_user flag
     start_date = db.Column(db.DateTime, nullable=True)
     end_date = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -39,6 +40,7 @@ class Group(db.Model):
             'isPublic': self.is_public,
             'joinCode': self.join_code if self.is_public is False else None,
             'status': self.status,
+            'isFlaggedManual': self.is_flagged,
             'startDate': self.start_date.isoformat() if self.start_date else None,
             'endDate': self.end_date.isoformat() if self.end_date else None,
             'createdAt': self.created_at.isoformat() if self.created_at else None,

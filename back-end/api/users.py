@@ -14,7 +14,7 @@ def get_user_groups(user_id):
     
     # Users can only view their own groups unless they're an admin
     user = User.query.get(current_user_id)
-    if user_id != current_user_id and user.role != 'admin':
+    if user_id != current_user_id and user.role != 'super_user':
         return jsonify({'message': 'You do not have permission to view this user\'s groups'}), 403
     
     # Get groups the user is a member of
@@ -39,7 +39,7 @@ def get_user_transactions(user_id):
     
     # Users can only view their own transactions unless they're an admin
     user = User.query.get(current_user_id)
-    if user_id != current_user_id and user.role != 'admin':
+    if user_id != current_user_id and user.role != 'super_user':
         return jsonify({'message': 'You do not have permission to view this user\'s transactions'}), 403
     
     # Get request parameters for filtering and pagination
@@ -82,7 +82,7 @@ def get_user_transaction_summary(user_id):
     
     # Users can only view their own transaction summary unless they're an admin
     user = User.query.get(current_user_id)
-    if user_id != current_user_id and user.role != 'admin':
+    if user_id != current_user_id and user.role != 'super_user':
         return jsonify({'message': 'You do not have permission to view this user\'s transaction summary'}), 403
     
     # Get period parameter (week, month, year, all)

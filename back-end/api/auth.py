@@ -167,15 +167,15 @@ def request_password_reset():
         msg.body = f"""
         Hello {user.first_name},
         
-        You recently requested to reset your password for your SaverCircle account.
-        
+        You recently requested to reset your password for your SaccoSave account.
+
         Please click the link below to reset your password:
         {reset_url}
-        
+
         This link is valid for 24 hours. If you did not request a password reset, please ignore this email.
-        
+
         Regards,
-        SaverCircle Team
+        SaccoSave Team
         """
         
         mail.send(msg)

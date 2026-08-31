@@ -23,7 +23,8 @@ class User(db.Model):
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expires_at = db.Column(db.DateTime, nullable=True)
 
-    # User role: 'user' or 'admin'
+    # Global role: 'user' or 'super_user' (read-only platform oversight).
+    # Per-group admin/member role lives on GroupMember, not here.
     role = db.Column(db.String(10), default='user')
 
     # Relationships

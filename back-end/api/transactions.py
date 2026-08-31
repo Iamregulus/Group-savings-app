@@ -22,8 +22,8 @@ def get_transaction(transaction_id):
     
     # Check if user has permission to view this transaction
     user = User.query.get(current_user_id)
-    # Allow if it's their transaction or they're an admin
-    if transaction.user_id != current_user_id and user.role != 'admin':
+    # Allow if it's their transaction or they're a super user
+    if transaction.user_id != current_user_id and user.role != 'super_user':
         # Also allow if they're a group admin
         is_group_admin = GroupMember.query.filter_by(
             user_id=current_user_id,
@@ -77,11 +77,14 @@ def export_transactions():
     end_date = request.args.get('endDate')
     transaction_type = request.args.get('type')
     
-    # Check permissions
+    # Check permissions. Bulk export of raw transaction data is intentionally
+    # not extended to super_user (read-only platform oversight) -- only a
+    # user's own transactions, or a group's transactions for its own
+    # members, can be exported.
     current_user = User.query.get(current_user_id)
-    if user_id and user_id != current_user_id and current_user.role != 'admin':
+    if user_id and user_id != current_user_id:
         return jsonify({'message': 'You do not have permission to export this user\'s transactions'}), 403
-    
+
     if group_id:
         # Check if user is a member of the group
         membership = GroupMember.query.filter_by(
@@ -89,8 +92,8 @@ def export_transactions():
             group_id=group_id,
             is_active=True
         ).first()
-        
-        if not membership and current_user.role != 'admin':
+
+        if not membership:
             return jsonify({'message': 'You do not have permission to export this group\'s transactions'}), 403
     
     # Build query

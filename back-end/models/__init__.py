@@ -1,5 +1,6 @@
-# This file indicates that the models directory is a Python package 
+# This file indicates that the models directory is a Python package
 from models.user import User
 from models.group import Group, GroupMember
 from models.transaction import Transaction
-from models.notification import Notification 
+from models.notification import Notification
+from models.withdrawal_approval import WithdrawalApproval 

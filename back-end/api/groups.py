@@ -3,11 +3,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from models.group import Group, GroupMember
 from models.user import User
 from models.transaction import Transaction
+from models.withdrawal_approval import WithdrawalApproval
 from app import db
 from decimal import Decimal
 import random
 import string
 import datetime
+
+ADMINS_PER_GROUP = 2
 
 
 def parse_amount(value):
@@ -592,6 +595,46 @@ def get_group_members(group_id):
     
     return jsonify(result), 200
 
+# Promote a member to co-admin (a group has at most 2 admins: the creator
+# plus one other member the creator designates)
+@groups_bp.route('/<group_id>/members/<user_id>/promote', methods=['POST'])
+@jwt_required()
+def promote_member(group_id, user_id):
+    current_user_id = get_jwt_identity()
+
+    group = Group.query.get(group_id)
+    if not group:
+        return jsonify({'message': 'Group not found'}), 404
+
+    if group.creator_id != current_user_id:
+        return jsonify({'message': 'Only the group creator can promote a co-admin'}), 403
+
+    current_admin_count = GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).count()
+    if current_admin_count >= ADMINS_PER_GROUP:
+        return jsonify({'message': f'This group already has {ADMINS_PER_GROUP} admins'}), 400
+
+    target_membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id, is_active=True).first()
+    if not target_membership:
+        return jsonify({'message': 'That user is not an active member of this group'}), 404
+
+    if target_membership.role == 'admin':
+        return jsonify({'message': 'That member is already an admin'}), 400
+
+    target_membership.role = 'admin'
+    db.session.commit()
+
+    from api.notifications import create_notification
+    create_notification(
+        user_id, None,
+        f"You have been made an admin of '{group.name}'. Withdrawal requests now require your approval.",
+        'promoted_admin'
+    )
+
+    return jsonify({
+        'message': 'Member promoted to admin successfully',
+        'membership': target_membership.to_dict()
+    }), 200
+
 # Make a contribution to a group
 @groups_bp.route('/<group_id>/contributions', methods=['POST'])
 @jwt_required()
@@ -634,11 +677,17 @@ def make_contribution(group_id):
     
     db.session.add(transaction)
     db.session.commit()
-    
-    # Notify admins about the contribution
-    from api.notifications import notify_admins
-    notify_admins(transaction.id, user_id, group_id, 'contribution')
-    
+
+    # A completed contribution is a cash-flow event -- notify every member
+    # of the group, not just admins.
+    contributor = User.query.get(user_id)
+    from api.notifications import notify_group_members
+    notify_group_members(
+        group_id, transaction.id,
+        f"{contributor.first_name} {contributor.last_name} contributed KES {transaction.amount} to '{group.name}'.",
+        'cashflow', exclude_user_id=user_id
+    )
+
     return jsonify({
         'message': 'Contribution made successfully',
         'transaction': transaction.to_dict()
@@ -660,11 +709,20 @@ def request_withdrawal(group_id):
     group = Group.query.get(group_id)
     if not group:
         return jsonify({'message': 'Group not found'}), 404
-    
+
+    # Withdrawals need dual-admin approval, so a group must have its full
+    # complement of admins before a request can even be made.
+    active_admin_count = GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).count()
+    if active_admin_count < ADMINS_PER_GROUP:
+        return jsonify({
+            'message': 'This group needs a second admin before withdrawals can be requested. '
+                       'Ask the group creator to promote a member to admin.'
+        }), 400
+
     # Check if required fields are present
     if not data or 'amount' not in data:
         return jsonify({'message': 'Amount is required'}), 400
-    
+
     # Calculate user's personal available balance
     user_contributions = db.session.query(db.func.sum(Transaction.amount)).filter_by(
         user_id=user_id,
@@ -702,70 +760,17 @@ def request_withdrawal(group_id):
     
     db.session.add(transaction)
     db.session.commit()
-    
-    # Get requesting user information for notifications
+
     requesting_user = User.query.get(user_id)
     requester_name = f"{requesting_user.first_name} {requesting_user.last_name}"
-    
-    # Find all admins of the group
-    admin_members = GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).all()
-    admin_ids = {member.user_id for member in admin_members}
-    
-    # Ensure the group creator is always notified
-    if group.creator_id:
-        admin_ids.add(group.creator_id)
-        
-    from models.notification import Notification
-    
-    # Create notifications for all admins and the creator
-    for recipient_id in admin_ids:
-        # Skip sending notification to the user who made the request
-        if recipient_id == user_id:
-            continue
-            
-        # Create notification
-        notification = Notification(
-            recipient_id=recipient_id,
-            transaction_id=transaction.id,
-            message=f"{requester_name} has requested a withdrawal of £{data['amount']} from group '{group.name}'. Please review.",
-            notification_type="withdrawal_request",
-            is_read=False
-        )
-        db.session.add(notification)
-    
-    db.session.commit()
-    
-    # Try to send email notifications to all admins
-    try:
-        from flask_mail import Message
-        from app import mail
-        
-        for admin_member in admin_members:
-            if admin_member.user_id == user_id:
-                continue
-                
-            admin = User.query.get(admin_member.user_id)
-            if admin and admin.email:
-                email_subject = f"New Withdrawal Request - {group.name}"
-                email_message = Message(
-                    subject=email_subject,
-                    recipients=[admin.email],
-                    body=f"""
-                    Hello {admin.first_name},
 
-                    {requester_name} has requested a withdrawal of £{data['amount']} from group '{group.name}'.
-                    
-                    Please log in to the platform to review and process this request.
+    from api.notifications import notify_group_admins
+    notify_group_admins(
+        group_id, transaction.id,
+        f"{requester_name} has requested a withdrawal of KES {transaction.amount} from '{group.name}'. Both admins must approve.",
+        'withdrawal_request', exclude_user_id=user_id
+    )
 
-                    Regards,
-                    Group Savings App Team
-                    """
-                )
-                mail.send(email_message)
-    except Exception as e:
-        # Log error but continue (don't fail if email fails)
-        print(f"Error sending email notification: {e}")
-    
     return jsonify({
         'message': 'Withdrawal request submitted successfully',
         'transaction': transaction.to_dict()
@@ -783,90 +788,113 @@ def process_withdrawal(group_id, transaction_id):
     if not group:
         return jsonify({'message': 'Group not found'}), 404
     
-    # Only a group admin (including the creator) can process withdrawal requests
+    # Only a group admin can vote on withdrawal requests
     membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id, role='admin', is_active=True).first()
     if not membership:
-        return jsonify({'message': 'You do not have permission to manage withdrawal requests for this group'}), 403
-    
-    # Get the transaction
-    transaction = Transaction.query.get(transaction_id)
+        return jsonify({'message': 'You do not have permission to vote on withdrawal requests for this group'}), 403
+
+    # Lock the transaction row so two admins voting near-simultaneously can't
+    # both observe a stale approval count (matters on Postgres; SQLite's
+    # single-writer lock already serializes this in dev/CI).
+    transaction = Transaction.query.filter_by(id=transaction_id).with_for_update().first()
     if not transaction:
         return jsonify({'message': 'Transaction not found'}), 404
-    
+
     # Validate transaction belongs to the group and is a pending withdrawal
     if (transaction.group_id != group_id or
         transaction.transaction_type != 'withdrawal' or
         transaction.status != 'pending'):
         return jsonify({'message': 'Invalid transaction'}), 400
-    
-    # Get action (approve/reject)
-    action = data.get('status')
-    if action not in ['completed', 'rejected']:
-        return jsonify({'message': 'Invalid action. Must be "completed" or "rejected"'}), 400
-    
-    # Update transaction
-    transaction.status = action
-    transaction.approved_by = user_id
-    transaction.remarks = data.get('remarks')
-    transaction.processed_at = datetime.datetime.utcnow()
-    
-    db.session.commit()
-    
-    # Get admin and user info for notification
+
+    decision = data.get('status')
+    if decision not in ['approved', 'rejected']:
+        return jsonify({'message': 'Invalid decision. Must be "approved" or "rejected"'}), 400
+
+    existing_vote = WithdrawalApproval.query.filter_by(transaction_id=transaction_id, admin_id=user_id).first()
+    if existing_vote:
+        return jsonify({'message': 'You have already voted on this withdrawal request'}), 400
+
+    remarks = data.get('remarks')
+    vote = WithdrawalApproval(transaction_id=transaction_id, admin_id=user_id, decision=decision)
+    db.session.add(vote)
+
     admin = User.query.get(user_id)
     requester = User.query.get(transaction.user_id)
-    
-    # Create notification for the user who requested the withdrawal
-    from models.notification import Notification
-    
-    # Prepare notification message
-    if action == 'completed':
-        message = f"Your withdrawal request for £{transaction.amount} has been approved by {admin.first_name} {admin.last_name}."
-    else:  # rejected
-        message = f"Your withdrawal request for £{transaction.amount} has been rejected by {admin.first_name} {admin.last_name}."
-        if transaction.remarks:
-            message += f" Reason: {transaction.remarks}"
-    
-    # Create notification
-    notification = Notification(
-        recipient_id=transaction.user_id,
-        transaction_id=transaction.id,
-        message=message,
-        notification_type=f"withdrawal_{action}",
-        is_read=False
-    )
-    
-    db.session.add(notification)
-    db.session.commit()
-    
-    # Try to send email notification if email is available
-    try:
-        from flask_mail import Message
-        from app import mail
-        
-        email_subject = f"Withdrawal Request {action.capitalize()}"
-        email_message = Message(
-            subject=email_subject,
-            recipients=[requester.email],
-            body=f"""
-            Hello {requester.first_name},
+    transaction.approved_by = user_id
+    if remarks:
+        transaction.remarks = remarks
 
-            {message}
+    from api.notifications import create_notification, notify_group_members
 
-            Please log in to the platform for more details.
+    other_admin_ids = [
+        m.user_id for m in GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).all()
+        if m.user_id != user_id
+    ]
 
-            Regards,
-            Group Savings App Team
-            """
-        )
-        mail.send(email_message)
-    except Exception as e:
-        # Log error but continue (don't fail if email fails)
-        print(f"Error sending email notification: {e}")
-    
+    if decision == 'rejected':
+        # Veto: a single rejection kills the request immediately.
+        transaction.status = 'rejected'
+        transaction.processed_at = datetime.datetime.utcnow()
+        db.session.commit()
+
+        message = f"Your withdrawal request for KES {transaction.amount} has been rejected by {admin.first_name} {admin.last_name}."
+        if remarks:
+            message += f" Reason: {remarks}"
+        create_notification(transaction.user_id, transaction.id, message, 'withdrawal_rejected')
+
+        for other_id in other_admin_ids:
+            create_notification(
+                other_id, transaction.id,
+                f"The withdrawal request from {requester.first_name} {requester.last_name} was rejected by {admin.first_name} {admin.last_name}.",
+                'withdrawal_rejected'
+            )
+
+        result_status = 'rejected'
+    else:
+        db.session.flush()
+
+        # Count approvals only from admins who are STILL currently active
+        # admins of this group -- a departed admin's earlier vote never
+        # counts, and a remaining admin's valid vote still counts once a new
+        # co-admin is promoted, with no separate "stalled" status needed.
+        active_admin_ids = {
+            m.user_id for m in GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).all()
+        }
+        approved_by_active_admins = {
+            a.admin_id for a in WithdrawalApproval.query.filter_by(transaction_id=transaction_id, decision='approved').all()
+            if a.admin_id in active_admin_ids
+        }
+
+        if len(approved_by_active_admins) >= ADMINS_PER_GROUP and len(active_admin_ids) == ADMINS_PER_GROUP:
+            transaction.status = 'completed'
+            transaction.processed_at = datetime.datetime.utcnow()
+            db.session.commit()
+
+            create_notification(
+                transaction.user_id, transaction.id,
+                f"Your withdrawal request for KES {transaction.amount} has been approved by both admins.",
+                'withdrawal_completed'
+            )
+            notify_group_members(
+                group_id, transaction.id,
+                f"A withdrawal of KES {transaction.amount} by {requester.first_name} {requester.last_name} has been completed.",
+                'cashflow', exclude_user_id=transaction.user_id
+            )
+            result_status = 'completed'
+        else:
+            db.session.commit()
+            for other_id in other_admin_ids:
+                create_notification(
+                    other_id, transaction.id,
+                    f"{admin.first_name} {admin.last_name} approved a withdrawal request from {requester.first_name} {requester.last_name} — your approval is also needed.",
+                    'withdrawal_vote'
+                )
+            result_status = 'pending'
+
     return jsonify({
-        'message': f'Withdrawal request {action}',
+        'message': f'Vote recorded: {decision}',
         'transaction': transaction.to_dict(),
+        'status': result_status,
         'processedBy': {
             'id': admin.id,
             'name': f"{admin.first_name} {admin.last_name}",

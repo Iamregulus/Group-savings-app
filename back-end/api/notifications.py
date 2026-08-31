@@ -7,93 +7,70 @@ from app import db, mail
 
 notifications_bp = Blueprint('notifications', __name__)
 
-# Helper function to notify admins
-def notify_admins(transaction_id, user_id, group_id, notification_type, custom_message=None):
-    """
-    Create notifications for all admin users and group admins
-    
-    Args:
-        transaction_id: ID of the related transaction
-        user_id: ID of the user who initiated the transaction
-        group_id: ID of the group related to the transaction
-        notification_type: Type of notification ('contribution' or 'withdrawal_request')
-        custom_message: Optional custom message to include in notification
-    """
-    from models.transaction import Transaction
-    from models.group import GroupMember
-    
-    # Find the transaction
-    transaction = Transaction.query.get(transaction_id)
-    if not transaction:
-        return
-    
-    # Find the user who made the transaction
-    user = User.query.get(user_id)
-    if not user:
-        return
-    
-    # Get all system admins
-    system_admins = User.query.filter_by(role='admin').all()
-    
-    # Get all group admins for this group
-    group_admins = User.query.join(GroupMember).filter(
-        GroupMember.group_id == group_id,
-        GroupMember.role == 'admin',
-        GroupMember.is_active == True
-    ).all()
-    
-    # Combine and remove duplicates
-    admin_ids = set()
-    admins_to_notify = []
-    
-    for admin in system_admins + group_admins:
-        if admin.id not in admin_ids and admin.id != user_id:  # Don't notify yourself
-            admin_ids.add(admin.id)
-            admins_to_notify.append(admin)
-    
-    # Prepare notification message based on type
-    if notification_type == 'contribution':
-        message = custom_message or f"{user.first_name} {user.last_name} has made a contribution of ${transaction.amount} to the group."
-    elif notification_type == 'withdrawal_request':
-        message = custom_message or f"{user.first_name} {user.last_name} has requested a withdrawal of ${transaction.amount} from the group."
-    else:
-        message = custom_message or f"New transaction from {user.first_name} {user.last_name}."
-    
-    # Create notifications for each admin
-    for admin in admins_to_notify:
-        notification = Notification(
-            recipient_id=admin.id,
-            transaction_id=transaction_id,
-            message=message,
-            notification_type=notification_type,
-            is_read=False
-        )
-        db.session.add(notification)
-        
-        # Optional: Send email notification
+
+def create_notification(recipient_id, transaction_id, message, notification_type):
+    """Create a single notification and best-effort email it. Never raises
+    on email failure — notification creation must not be blocked by mail
+    delivery issues."""
+    notification = Notification(
+        recipient_id=recipient_id,
+        transaction_id=transaction_id,
+        message=message,
+        notification_type=notification_type,
+        is_read=False
+    )
+    db.session.add(notification)
+
+    recipient = User.query.get(recipient_id)
+    if recipient and recipient.email:
         try:
-            email_subject = f"New {notification_type.replace('_', ' ')} notification"
             email_message = Message(
-                subject=email_subject,
-                recipients=[admin.email],
+                subject=f"New {notification_type.replace('_', ' ')} notification",
+                recipients=[recipient.email],
                 body=f"""
-                Hello {admin.first_name},
-                
+                Hello {recipient.first_name},
+
                 {message}
-                
+
                 Please log in to the platform to take action if needed.
-                
+
                 Regards,
-                Group Savings App Team
+                SaccoSave Team
                 """
             )
             mail.send(email_message)
         except Exception as e:
-            # Log error but continue (don't fail if email fails)
             print(f"Error sending email notification: {e}")
-    
-    # Commit all notifications
+
+    return notification
+
+
+def notify_group_admins(group_id, transaction_id, message, notification_type, exclude_user_id=None):
+    """Notify every active admin of a group (used for events needing admin
+    action, e.g. a new contribution or withdrawal request)."""
+    from models.group import GroupMember
+
+    admins = GroupMember.query.filter_by(group_id=group_id, role='admin', is_active=True).all()
+    for membership in admins:
+        if membership.user_id == exclude_user_id:
+            continue
+        create_notification(membership.user_id, transaction_id, message, notification_type)
     db.session.commit()
+
+
+def notify_group_members(group_id, transaction_id, message, notification_type, exclude_user_id=None):
+    """Notify every active member of a group (used for cash-flow events that
+    concern the whole group, e.g. a completed contribution or withdrawal)."""
+    from models.group import GroupMember
+
+    members = GroupMember.query.filter_by(group_id=group_id, is_active=True).all()
+    for membership in members:
+        if membership.user_id == exclude_user_id:
+            continue
+        create_notification(membership.user_id, transaction_id, message, notification_type)
+    db.session.commit()
+
+
 
 @notifications_bp.route('/', methods=['GET'])
 @jwt_required()
