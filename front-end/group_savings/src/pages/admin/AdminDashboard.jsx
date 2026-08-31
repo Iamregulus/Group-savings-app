@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { groupService } from '../../services/groupService';
-import { transactionService } from '../../services/transactionService';
 import api from '../../services/api'; // Import the main api service
 
 // Components

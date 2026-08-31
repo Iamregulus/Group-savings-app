@@ -3,73 +3,41 @@ import api from './api';
 export const authService = {
   // User login
   async login(email, password) {
-    try {
-      return await api.post('/auth/login', { email, password });
-    } catch (error) {
-      throw error;
-    }
+    return await api.post('/auth/login', { email, password });
   },
 
   // User signup
   async signup(userData) {
-    try {
-      return await api.post('/auth/register', userData);
-    } catch (error) {
-      throw error;
-    }
+    return await api.post('/auth/register', userData);
   },
 
   // Get current user profile
   async getCurrentUser() {
-    try {
-      return await api.get('/auth/profile');
-    } catch (error) {
-      throw error;
-    }
+    return await api.get('/auth/profile');
   },
 
   // Update user profile
   async updateProfile(userData) {
-    try {
-      return await api.put('/auth/profile', userData);
-    } catch (error) {
-      throw error;
-    }
+    return await api.put('/auth/profile', userData);
   },
 
   // Update user password
   async changePassword(currentPassword, newPassword) {
-    try {
-      return await api.put('/auth/password', { currentPassword, newPassword });
-    } catch (error) {
-      throw error;
-    }
+    return await api.put('/auth/password', { currentPassword, newPassword });
   },
 
   // Request password reset
   async requestPasswordReset(email) {
-    try {
-      return await api.post('/auth/reset-password', { email });
-    } catch (error) {
-      throw error;
-    }
+    return await api.post('/auth/reset-password', { email });
   },
 
   // Reset password with token
   async resetPassword(token, newPassword) {
-    try {
-      return await api.post(`/auth/reset-password/${token}`, { password: newPassword });
-    } catch (error) {
-      throw error;
-    }
+    return await api.post(`/auth/reset-password/${token}`, { password: newPassword });
   },
 
   // Verify email with token
   async verifyEmail(token) {
-    try {
-      return await api.get(`/auth/verify-email/${token}`);
-    } catch (error) {
-      throw error;
-    }
+    return await api.get(`/auth/verify-email/${token}`);
   }
 };

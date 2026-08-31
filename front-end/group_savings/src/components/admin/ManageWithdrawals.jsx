@@ -60,7 +60,7 @@ const ManageWithdrawals = () => {
             // Try to get full transaction details
             const fullDetails = await transactionService.getTransactionById(request.id);
             return fullDetails;
-          } catch (error) {
+          } catch {
             // If can't get details, return original request
             return request;
           }

@@ -2,7 +2,7 @@ import React from 'react';
 import Card from '../common/Card';
 
 const GroupCard = ({ group, onClick, currency = '£' }) => {
-  const { id, name, description, totalSaved, targetAmount, memberCount, createdAt, nextPaymentDate, userSavings } = group;
+  const { name, description, totalSaved, targetAmount, memberCount, createdAt, nextPaymentDate, userSavings } = group;
   
   // Calculate progress percentage
   const progressPercentage = targetAmount ? Math.min((totalSaved / targetAmount) * 100, 100) : 0;

@@ -188,42 +188,26 @@ const groupService = {
 
   // Get details of a specific group
   async getGroupById(groupId) {
-    try {
-      const response = await api.get(`/groups/${groupId}`);
-      return response.data || {};
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.get(`/groups/${groupId}`);
+    return response.data || {};
   },
 
   // Update a group's details
   async updateGroup(groupId, groupData) {
-    try {
-      const response = await api.put(`/groups/${groupId}`, groupData);
-      return response.data || {};
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.put(`/groups/${groupId}`, groupData);
+    return response.data || {};
   },
 
   // Get members of a group
   async getGroupMembers(groupId) {
-    try {
-      const response = await api.get(`/groups/${groupId}/members`);
-      return response.data || [];
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.get(`/groups/${groupId}/members`);
+    return response.data || [];
   },
 
   // Get group statistics
   async getGroupStats(groupId) {
-    try {
-      const response = await api.get(`/groups/${groupId}/stats`);
-      return response.data || {};
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.get(`/groups/${groupId}/stats`);
+    return response.data || {};
   },
 
   // Admin: Approve or reject a withdrawal request

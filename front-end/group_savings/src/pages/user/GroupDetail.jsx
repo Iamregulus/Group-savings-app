@@ -27,7 +27,7 @@ const GroupDetail = () => {
   const [leavingGroup, setLeavingGroup] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState(location.state?.message || null);
-  const [isNewGroup, setIsNewGroup] = useState(location.state?.newGroup || false);
+  const [isNewGroup] = useState(location.state?.newGroup || false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -288,18 +288,6 @@ const GroupDetail = () => {
       console.error(error);
       setIsDeleting(false);
     }
-  };
-
-  // Check if user can leave the group (if they're the only admin, they cannot leave)
-  const canLeaveGroup = () => {
-    if (!group) return false;
-    
-    // If user is not an admin, they can leave
-    if (group.userRole !== 'admin') return true;
-    
-    // If user is admin, check if there are other admins
-    const adminCount = group.members?.filter(member => member.role === 'admin').length || 0;
-    return adminCount > 1;
   };
 
   if (loading) return <Loader centered size="large" />;

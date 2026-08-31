@@ -5,7 +5,7 @@ import { useNotifications } from '../../context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const NotificationDropdown = () => {
-  const { unreadCount, markAsRead, fetchUnreadCount, isAuthenticated } = useNotifications();
+  const { unreadCount, markAsRead, isAuthenticated } = useNotifications();
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

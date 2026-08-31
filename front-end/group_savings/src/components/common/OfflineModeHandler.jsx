@@ -43,7 +43,7 @@ const OfflineModeHandler = () => {
         setShowMessage(true);
         setMessage('Server returned an unexpected response.');
       }
-    } catch (error) {
+    } catch {
       setConnectionStatus('error');
       setShowMessage(true);
       setMessage('Unable to connect to the server. Please check if the backend is running.');
@@ -53,10 +53,10 @@ const OfflineModeHandler = () => {
   const tryReconnect = async () => {
     setIsRetrying(true);
     setMessage('Trying to reconnect...');
-    
+
     try {
       await checkConnectionStatus();
-    } catch (error) {
+    } catch {
       setMessage('Still unable to connect to the server.');
     } finally {
       setIsRetrying(false);
