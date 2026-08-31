@@ -775,8 +775,9 @@ def process_withdrawal(group_id, transaction_id):
     if not group:
         return jsonify({'message': 'Group not found'}), 404
     
-    # Only the group creator can process withdrawal requests
-    if group.creator_id != user_id:
+    # Only a group admin (including the creator) can process withdrawal requests
+    membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id, role='admin', is_active=True).first()
+    if not membership:
         return jsonify({'message': 'You do not have permission to manage withdrawal requests for this group'}), 403
     
     # Get the transaction
@@ -861,7 +862,7 @@ def process_withdrawal(group_id, transaction_id):
         'processedBy': {
             'id': admin.id,
             'name': f"{admin.first_name} {admin.last_name}",
-            'isCreator': True
+            'isCreator': admin.id == group.creator_id
         }
     }), 200
 
