@@ -202,3 +202,30 @@ def test_departed_admins_vote_does_not_count_toward_completion(client):
     admin3_vote = client.put(f'/api/groups/{group_id}/withdrawals/{transaction_id}',
                               json={'status': 'approved'}, headers=auth_headers(admin3_token))
     assert admin3_vote.get_json()['status'] == 'completed'
+
+
+def test_group_transactions_expose_approval_progress(client):
+    creator_token, creator_id = _register_and_get_token(client, 'creator8@example.com')
+    member_token, member_id = _register_and_get_token(client, 'member8@example.com')
+    group_id = _create_group_with_contribution(client, creator_token)
+
+    client.post(f'/api/groups/{group_id}/join', json={}, headers=auth_headers(member_token))
+    client.post(f'/api/groups/{group_id}/members/{member_id}/promote', headers=auth_headers(creator_token))
+
+    resp = client.post(f'/api/groups/{group_id}/withdrawals', json={'amount': '10.00'},
+                        headers=auth_headers(creator_token))
+    transaction_id = resp.get_json()['transaction']['id']
+
+    listing = client.get(f'/api/groups/{group_id}/transactions', headers=auth_headers(creator_token))
+    pending = next(t for t in listing.get_json() if t['id'] == transaction_id)
+    assert pending['approvedCount'] == 0
+    assert pending['requiredApprovals'] == 2
+    assert pending['myVote'] is None
+
+    client.put(f'/api/groups/{group_id}/withdrawals/{transaction_id}',
+               json={'status': 'approved'}, headers=auth_headers(creator_token))
+
+    listing2 = client.get(f'/api/groups/{group_id}/transactions', headers=auth_headers(creator_token))
+    pending2 = next(t for t in listing2.get_json() if t['id'] == transaction_id)
+    assert pending2['approvedCount'] == 1
+    assert pending2['myVote'] == 'approved'

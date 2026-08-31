@@ -217,16 +217,29 @@ def get_group(group_id):
 @jwt_required()
 def get_group_transactions(group_id):
     user_id = get_jwt_identity()
-    
+
     # Check if the user is a member of the group
     membership = GroupMember.query.filter_by(user_id=user_id, group_id=group_id).first()
     if not membership:
         return jsonify(message="You are not authorized to view these transactions"), 403
-        
+
     # Get all transactions for the group
     transactions = Transaction.query.filter_by(group_id=group_id).order_by(Transaction.created_at.desc()).all()
-    
-    return jsonify([t.to_dict() for t in transactions]), 200
+
+    result = []
+    for t in transactions:
+        t_dict = t.to_dict()
+        # Surface dual-admin approval progress for pending withdrawals so the
+        # UI can show "X of 2 approved" and whether the viewer already voted.
+        if t.transaction_type == 'withdrawal' and t.status == 'pending':
+            votes = WithdrawalApproval.query.filter_by(transaction_id=t.id).all()
+            t_dict['approvedCount'] = sum(1 for v in votes if v.decision == 'approved')
+            t_dict['requiredApprovals'] = ADMINS_PER_GROUP
+            my_vote = next((v for v in votes if v.admin_id == user_id), None)
+            t_dict['myVote'] = my_vote.decision if my_vote else None
+        result.append(t_dict)
+
+    return jsonify(result), 200
 
 # Create a new group
 @groups_bp.route('', methods=['POST'])
