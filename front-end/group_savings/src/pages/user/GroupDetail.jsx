@@ -321,6 +321,10 @@ const GroupDetail = () => {
   // Check if the current user is the creator of the group
   const isCreator = currentUser?.id === group.creatorId;
 
+  // If the user is the only admin, they cannot leave (matches backend rule)
+  const canLeaveGroup = group.userRole !== 'admin' ||
+    (group.members?.filter(member => member.role === 'admin').length || 0) > 1;
+
   return (
     <div className="container mx-auto px-4 py-8">
       {successMessage && (
@@ -490,6 +494,15 @@ const GroupDetail = () => {
             </svg>
             Withdraw
           </Button>
+          <div title={canLeaveGroup ? undefined : 'You are the only admin of this group. Promote another member to admin before leaving.'}>
+            <Button
+              variant="outline"
+              onClick={() => setShowLeaveConfirmModal(true)}
+              disabled={!canLeaveGroup}
+            >
+              Leave Group
+            </Button>
+          </div>
         </div>
       )}
 
