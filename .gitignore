@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+.env.*
+
+# Flask instance folder / database
+instance/
+*.db
+*.sqlite3
+
+# Build output
+dist/
+dist-ssr/
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
