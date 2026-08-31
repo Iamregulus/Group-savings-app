@@ -1,420 +1,177 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 import ErrorMessage from '../../components/common/ErrorMessage';
 
+const inputClass = (hasError) =>
+  `w-full rounded-lg border bg-gray-900 px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+    hasError ? 'border-red-500' : 'border-gray-700'
+  }`;
+
 const Signup = () => {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phoneNumber: ''
-  });
-  const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const { register, handleSubmit, watch, formState: { errors } } = useForm();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formError, setFormError] = useState(null);
   const [networkError, setNetworkError] = useState(false);
-  
+
   const { signup } = useAuth();
   const navigate = useNavigate();
-  
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-    // Clear error when user types
-    if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: ''
-      });
-    }
-    // Clear network error when user types
-    if (networkError) {
-      setNetworkError(false);
-    }
-  };
-  
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    }
-    
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-  
-  const handleSubmit = async (e) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
-    }
-    
-    if (!validateForm()) return;
-    
+  const password = watch('password');
+
+  const onSubmit = async (data) => {
+    setFormError(null);
+    setNetworkError(false);
     try {
       setIsLoading(true);
-      
-      // Match the data structure expected by the backend
       const userData = {
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        phoneNumber: formData.phoneNumber.trim()
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+        phoneNumber: data.phoneNumber.trim(),
       };
-      
       const userRole = await signup(userData);
-      
-      // Redirect based on role
-      if (userRole === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate(userRole === 'super_user' ? '/super-admin' : '/dashboard');
     } catch (error) {
-      console.error('Signup error:', error);
-      
-      // Check if it's a network error
       if (error.message && error.message.includes('Network Error')) {
         setNetworkError(true);
       } else {
-        setErrors({
-          ...errors,
-          form: error.message || 'Signup failed. Please try again.'
-        });
+        setFormError(error.message || 'Signup failed. Please try again.');
       }
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const handleRetryConnection = () => {
-    setNetworkError(false);
-    handleSubmit();
-  };
-  
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
 
-  const toggleConfirmPasswordVisibility = () => {
-    setShowConfirmPassword(!showConfirmPassword);
-  };
-  
-  // Updated styles to match login page
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    height: '44px',
-    border: '1px solid #333',
-    borderRadius: '5px',
-    background: '#1a1a1a',
-    color: '#fff',
-    fontSize: '16px',
-    boxSizing: 'border-box',
-    outline: 'none',
-    caretColor: '#fff'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: '8px',
-    fontWeight: '500',
-    color: '#fff',
-    fontSize: '16px'
-  };
-  
-  // Error message style
-  const errorStyle = {
-    color: '#ff6b6b', 
-    fontSize: '12px', 
-    marginTop: '5px'
-  };
-  
   return (
-    <div style={{ 
-      minHeight: '100vh',
-      width: '100%',
-      margin: 0,
-      padding: 0,
-      background: '#1a1a1a',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'auto'
-    }}>
-      <div style={{
-        background: '#1a1a1a',
-        width: '100%',
-        maxWidth: '500px',
-        padding: '40px 30px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        minHeight: 'auto',
-        boxSizing: 'border-box'
-      }}>
-        <h1 style={{ 
-          textAlign: 'center', 
-          marginBottom: '8px', 
-          color: '#fff',
-          fontSize: '32px',
-          fontWeight: '600' 
-        }}>
-          Create Account
-        </h1>
-        
-        <p style={{ 
-          textAlign: 'center', 
-          marginBottom: '30px', 
-          color: '#fff',
-          fontSize: '16px'
-        }}>
-          Join our community and start saving today!
-        </p>
-        
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-white">Create Account</h1>
+          <p className="text-gray-400 text-sm mt-1">Join our community and start saving today!</p>
+        </div>
+
         {networkError && (
-          <ErrorMessage 
-            message="Network Error: Unable to connect to the server. Please check your internet connection or try again later." 
-            onRetry={handleRetryConnection}
+          <ErrorMessage
+            message="Network Error: Unable to connect to the server. Please check your internet connection or try again later."
+            onRetry={handleSubmit(onSubmit)}
           />
         )}
-        
-        {errors.form && !networkError && (
-          <ErrorMessage message={errors.form} />
-        )}
-        
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>First Name</label>
+        {formError && !networkError && <ErrorMessage message={formError} />}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">First Name</label>
               <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
                 placeholder="First Name"
-                style={{
-                  ...inputStyle,
-                  borderColor: errors.firstName ? '#dc3545' : '#333'
-                }}
-                className="form-input"
+                className={inputClass(errors.firstName)}
+                {...register('firstName', { required: 'First name is required' })}
               />
-              {errors.firstName && <div style={errorStyle}>{errors.firstName}</div>}
+              {errors.firstName && <p className="mt-1 text-xs text-red-400">{errors.firstName.message}</p>}
             </div>
-            
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Last Name</label>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Last Name</label>
               <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
                 placeholder="Last Name"
-                style={{
-                  ...inputStyle,
-                  borderColor: errors.lastName ? '#dc3545' : '#333'
-                }}
-                className="form-input"
+                className={inputClass(errors.lastName)}
+                {...register('lastName', { required: 'Last name is required' })}
               />
-              {errors.lastName && <div style={errorStyle}>{errors.lastName}</div>}
+              {errors.lastName && <p className="mt-1 text-xs text-red-400">{errors.lastName.message}</p>}
             </div>
           </div>
-          
-          <div style={{ marginBottom: '24px' }}>
-            <label style={labelStyle}>Email</label>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
             <input
               type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
               placeholder="Enter your email"
-              style={{
-                ...inputStyle,
-                borderColor: errors.email ? '#dc3545' : '#333'
-              }}
-              className="form-input"
+              className={inputClass(errors.email)}
+              {...register('email', {
+                required: 'Email is required',
+                pattern: { value: /\S+@\S+\.\S+/, message: 'Email is invalid' },
+              })}
             />
-            {errors.email && <div style={errorStyle}>{errors.email}</div>}
+            {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
           </div>
-          
-          <div style={{ marginBottom: '24px' }}>
-            <label style={labelStyle}>Phone Number</label>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Phone Number</label>
             <input
               type="tel"
-              name="phoneNumber"
-              value={formData.phoneNumber}
-              onChange={handleChange}
               placeholder="Enter your phone number"
-              style={{
-                ...inputStyle,
-                borderColor: errors.phoneNumber ? '#dc3545' : '#333'
-              }}
-              className="form-input"
+              className={inputClass(errors.phoneNumber)}
+              {...register('phoneNumber', { required: 'Phone number is required' })}
             />
-            {errors.phoneNumber && <div style={errorStyle}>{errors.phoneNumber}</div>}
+            {errors.phoneNumber && <p className="mt-1 text-xs text-red-400">{errors.phoneNumber.message}</p>}
           </div>
-          
-          <div style={{ marginBottom: '24px' }}>
-            <label style={labelStyle}>Password</label>
-            <div style={{ position: 'relative' }}>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
+            <div className="relative">
               <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
+                type={showPassword ? 'text' : 'password'}
                 placeholder="Create a password"
-                style={{
-                  ...inputStyle,
-                  paddingRight: '50px',
-                  borderColor: errors.password ? '#dc3545' : '#333'
-                }}
-                className="form-input"
+                className={`${inputClass(errors.password)} pr-11`}
+                {...register('password', {
+                  required: 'Password is required',
+                  minLength: { value: 8, message: 'Password must be at least 8 characters' },
+                })}
               />
               <button
                 type="button"
-                onClick={togglePasswordVisibility}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#4ecdc4',
-                  cursor: 'pointer',
-                  padding: '5px',
-                  fontSize: '14px'
-                }}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400"
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? <HiOutlineEyeSlash className="h-5 w-5" /> : <HiOutlineEye className="h-5 w-5" />}
               </button>
             </div>
-            {errors.password && <div style={errorStyle}>{errors.password}</div>}
+            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
           </div>
-          
-          <div style={{ marginBottom: '24px' }}>
-            <label style={labelStyle}>Confirm Password</label>
-            <div style={{ position: 'relative' }}>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Confirm Password</label>
+            <div className="relative">
               <input
-                type={showConfirmPassword ? "text" : "password"}
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
+                type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="Confirm your password"
-                style={{
-                  ...inputStyle,
-                  paddingRight: '50px',
-                  borderColor: errors.confirmPassword ? '#dc3545' : '#333'
-                }}
-                className="form-input"
+                className={`${inputClass(errors.confirmPassword)} pr-11`}
+                {...register('confirmPassword', {
+                  required: 'Please confirm your password',
+                  validate: (value) => value === password || 'Passwords do not match',
+                })}
               />
               <button
                 type="button"
-                onClick={toggleConfirmPasswordVisibility}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#4ecdc4',
-                  cursor: 'pointer',
-                  padding: '5px',
-                  fontSize: '14px'
-                }}
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400"
               >
-                {showConfirmPassword ? 'Hide' : 'Show'}
+                {showConfirmPassword ? <HiOutlineEyeSlash className="h-5 w-5" /> : <HiOutlineEye className="h-5 w-5" />}
               </button>
             </div>
-            {errors.confirmPassword && <div style={errorStyle}>{errors.confirmPassword}</div>}
+            {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>}
           </div>
-          
+
           <button
             type="submit"
             disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: '#4ecdc4',
-              border: 'none',
-              borderRadius: '5px',
-              color: '#1a1a1a',
-              fontWeight: '600',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.7 : 1,
-              fontSize: '16px',
-              height: '48px',
-              marginBottom: '24px'
-            }}
+            className="w-full rounded-lg bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Creating Account...' : 'Sign up'}
           </button>
-          
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#fff', fontSize: '14px' }}>
-              Already have an account? <Link to="/login" style={{ color: '#4ecdc4', fontWeight: '600', textDecoration: 'none' }}>Log in</Link>
-            </p>
-          </div>
+
+          <p className="text-center text-sm text-gray-400">
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-emerald-400 hover:text-emerald-300">Log in</Link>
+          </p>
         </form>
       </div>
     </div>
   );
 };
-
-// Add global styles to ensure placeholders and input text are properly visible
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  input::placeholder {
-    color: #888 !important;
-    opacity: 1 !important;
-  }
-  
-  input:focus {
-    color: #fff !important;
-  }
-  
-  .form-input {
-    color: #fff !important;
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default Signup;

@@ -1,46 +1,28 @@
 import React from 'react';
 
+const SIZES = {
+  small: 'h-8 w-8 text-xs',
+  medium: 'h-10 w-10 text-sm',
+  large: 'h-16 w-16 text-lg',
+  xlarge: 'h-24 w-24 text-2xl',
+};
+
 const UserAvatar = ({ user, size = 'medium', showName = false }) => {
-  // Get initials from name
-  const getInitials = () => {
-    if (!user.name) return '?';
-    
-    const nameParts = user.name.split(' ');
-    if (nameParts.length === 1) {
-      return nameParts[0].charAt(0).toUpperCase();
-    } else {
-      return (
-        nameParts[0].charAt(0).toUpperCase() + 
-        nameParts[nameParts.length - 1].charAt(0).toUpperCase()
-      );
-    }
-  };
-  
-  // Get size class
-  const getSizeClass = () => {
-    switch (size) {
-      case 'small': return 'avatar-sm';
-      case 'large': return 'avatar-lg';
-      case 'xlarge': return 'avatar-xl';
-      default: return 'avatar-md';
-    }
-  };
-  
+  const initials = user
+    ? `${(user.firstName || '?')[0]}${(user.lastName || '')[0] || ''}`.toUpperCase()
+    : '?';
+
   return (
-    <div className="user-avatar-container">
-      <div className={`user-avatar ${getSizeClass()}`}>
-        {user.profilePicture ? (
-          <img 
-            src={user.profilePicture} 
-            alt={user.name || 'User'} 
-            className="avatar-img"
-          />
+    <div className="flex items-center gap-2">
+      <div className={`flex items-center justify-center rounded-full bg-emerald-600 text-white font-semibold flex-shrink-0 ${SIZES[size] || SIZES.medium}`}>
+        {user?.profilePicture ? (
+          <img src={user.profilePicture} alt={`${user.firstName} ${user.lastName}`} className="h-full w-full rounded-full object-cover" />
         ) : (
-          <div className="avatar-initials">{getInitials()}</div>
+          initials
         )}
       </div>
-      {showName && user.name && (
-        <span className="avatar-name">{user.name}</span>
+      {showName && user && (
+        <span className="font-medium text-gray-900 dark:text-white">{user.firstName} {user.lastName}</span>
       )}
     </div>
   );

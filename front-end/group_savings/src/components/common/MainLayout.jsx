@@ -1,43 +1,32 @@
-import React, { useState } from 'react';
-import Sidebar from './Sidebar';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import BottomNav from './BottomNav';
 import NotificationDropdown from './NotificationDropdown';
-import { useTheme } from '../../context/ThemeContext';
+import ThemeToggle from './ThemeToggle';
 
 const MainLayout = ({ children }) => {
-  const { darkMode } = useTheme();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const closeSidebar = () => setSidebarOpen(false);
-  const openSidebar = () => setSidebarOpen(true);
-
   return (
-    <div className={`app ${darkMode ? 'dark-mode' : 'light-mode'}`}>
-      <Sidebar isOpen={sidebarOpen} onNavigate={closeSidebar} onClose={closeSidebar} />
-
-      {/* Mobile top bar */}
-      <div className="mobile-nav">
-        <button className="menu-button" onClick={openSidebar} aria-label="Open menu">
-          <span className="material-icons">menu</span>
-        </button>
-        <div className="mobile-title">SaverCircle</div>
-        <div className="mobile-actions">
-          <NotificationDropdown />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+      <header className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white text-sm font-bold">S</span>
+            <span className="font-semibold text-gray-900 dark:text-white">SaccoSave</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <NotificationDropdown />
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Backdrop for mobile drawer */}
-      {sidebarOpen && <div className="sidebar-backdrop" onClick={closeSidebar} />}
+      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-4 pb-24">
+        {children}
+      </main>
 
-      <div className="content-wrapper">
-        <div className="notification-bar flex justify-end px-4 py-2">
-          <NotificationDropdown />
-        </div>
-        <main className="main-content">
-          {children}
-        </main>
-      </div>
+      <BottomNav />
     </div>
   );
 };
 
-export default MainLayout; 
+export default MainLayout;

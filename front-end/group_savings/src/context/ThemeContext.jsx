@@ -11,13 +11,16 @@ export const ThemeProvider = ({ children }) => {
     return savedTheme ? savedTheme === 'dark' : true; // Default to dark theme
   });
   
-  // Update theme when darkMode changes
+  // Update theme when darkMode changes. Tailwind's `dark:` utilities key off
+  // a `dark` class on <html> -- this is the single source of truth for
+  // theme, matching the one-time class the inline script in index.html sets
+  // on first paint (see index.html) so there's no flash-then-flip.
   useEffect(() => {
     if (darkMode) {
-      document.documentElement.classList.add('dark-theme');
+      document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
     } else {
-      document.documentElement.classList.remove('dark-theme');
+      document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);

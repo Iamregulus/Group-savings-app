@@ -27,8 +27,7 @@ export const transactionService = {
 
   // Get a specific transaction details
   async getTransactionById(transactionId) {
-    const response = await api.get(`/transactions/${transactionId}`);
-    return response.data || {};
+    return await api.get(`/transactions/${transactionId}`);
   },
 
   // Get transaction statistics/summary for a user

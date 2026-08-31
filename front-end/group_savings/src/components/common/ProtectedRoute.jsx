@@ -22,8 +22,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   
   // Check if route requires specific role
   if (requiredRole && currentUser && currentUser.role !== requiredRole) {
-    // Redirect admin to admin dashboard, regular users to user dashboard
-    const redirectPath = currentUser.role === 'admin' ? '/admin' : '/dashboard';
+    // Redirect super users to their analytics view, regular users to the dashboard
+    const redirectPath = currentUser.role === 'super_user' ? '/super-admin' : '/dashboard';
     return <Navigate to={redirectPath} replace />;
   }
   

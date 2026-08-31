@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { HiOutlineBell } from 'react-icons/hi2';
 import { notificationService } from '../../services/notificationService';
 import { useNotifications } from '../../context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -11,141 +12,114 @@ const NotificationDropdown = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
-  
-  // Load notifications when dropdown is opened
+
   const fetchNotifications = async () => {
     if (!isAuthenticated) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
       const response = await notificationService.getNotifications({ limit: 5 });
-      setNotifications(response.data.notifications || []);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+      setNotifications(response.notifications || []);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
       setError('Failed to load notifications');
       setNotifications([]);
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // Fetch notifications when the dropdown is opened
+
   useEffect(() => {
     if (isOpen && isAuthenticated) {
       fetchNotifications();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isAuthenticated]);
-  
-  // Handle click outside to close dropdown
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
-  // Mark a notification as read
+
   const handleMarkAsRead = async (notificationId) => {
     if (!isAuthenticated) return;
-    
+
     try {
       await markAsRead(notificationId);
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification.id === notificationId 
-            ? { ...notification, isRead: true } 
-            : notification
-        )
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       );
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
     }
   };
-  
-  // Toggle dropdown
-  const toggleDropdown = () => {
-    setIsOpen(!isOpen);
-  };
 
-  // View all notifications link
-  const viewAllNotifications = () => {
-    setIsOpen(false);
-  };
-  
-  // If not authenticated, don't render anything
   if (!isAuthenticated) return null;
-  
+
   return (
-    <div className="notification-dropdown" ref={dropdownRef}>
-      <button 
-        className="notification-icon" 
-        onClick={toggleDropdown}
+    <div className="relative" ref={dropdownRef}>
+      <button
+        className="relative p-2 rounded-full text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+        onClick={() => setIsOpen((v) => !v)}
         aria-label="Notifications"
       >
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          width="24" 
-          height="24" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        >
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
+        <HiOutlineBell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="notification-badge">{unreadCount}</span>
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
         )}
       </button>
-      
+
       {isOpen && (
-        <div className="notification-menu">
-          <div className="notification-header">
-            <h3>Notifications</h3>
+        <div className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-40">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
           </div>
-          
-          <div className="notification-list">
+
+          <div className="max-h-80 overflow-y-auto">
             {isLoading ? (
-              <div className="notification-loading">Loading notifications...</div>
+              <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Loading...</div>
             ) : error ? (
-              <div className="notification-error">{error}</div>
+              <div className="p-4 text-sm text-red-500">{error}</div>
             ) : notifications.length > 0 ? (
-              notifications.map(notification => (
-                <div 
+              notifications.map((notification) => (
+                <div
                   key={notification.id}
-                  className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
+                  className={`flex items-start gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                    !notification.isRead ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : ''
+                  }`}
                   onClick={() => handleMarkAsRead(notification.id)}
                 >
-                  <div className="notification-content">
-                    <p>{notification.message}</p>
-                    <span className="notification-time">
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-800 dark:text-gray-200">{notification.message}</p>
+                    <span className="text-xs text-gray-400">
                       {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                     </span>
                   </div>
                   {!notification.isRead && (
-                    <div className="unread-indicator" />
+                    <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0" />
                   )}
                 </div>
               ))
             ) : (
-              <div className="no-notifications">No notifications</div>
+              <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">No notifications</div>
             )}
           </div>
-          
-          <div className="notification-footer">
-            <Link to="/notifications" onClick={viewAllNotifications}>
+
+          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-center">
+            <Link
+              to="/notifications"
+              className="text-sm font-medium text-emerald-600 dark:text-emerald-400"
+              onClick={() => setIsOpen(false)}
+            >
               View all notifications
             </Link>
           </div>
@@ -155,4 +129,4 @@ const NotificationDropdown = () => {
   );
 };
 
-export default NotificationDropdown; 
+export default NotificationDropdown;

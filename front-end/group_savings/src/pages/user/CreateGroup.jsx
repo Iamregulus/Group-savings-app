@@ -1,186 +1,47 @@
-/* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import { groupService } from '../../services/groupService';
-import { useAuth } from '../../context/AuthContext';
-
-// Components
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import Input from '../../components/common/Input';
 import Loader from '../../components/common/Loader';
+import Alert from '../../components/common/Alert';
 
-// Required field indicator component
-const RequiredField = () => (
-  <span style={{ color: 'red', marginLeft: '4px' }}>*</span>
-);
+const inputClass = 'w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
 const CreateGroup = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    targetAmount: '',
-    isPublic: false,
-    contributionFrequency: 'monthly',
-    contributionAmount: '',
-    maxMembers: '10', // Default value
-    goalDate: ''
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: { maxMembers: 10, contributionFrequency: 'monthly', isPublic: false },
   });
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [formErrors, setFormErrors] = useState({});
-  const [debugInfo, setDebugInfo] = useState(null);
 
-  // Add a window-level function for debugging from console
-  useEffect(() => {
-    window.submitGroupForm = (data) => {
-      const testData = data || {
-        name: "Test Group",
-        description: "This is a test group",
-        targetAmount: 1000,
-        contributionAmount: 100,
-        contributionFrequency: "monthly",
-        maxMembers: 10,
-        isPublic: true
-      };
-      console.log("Testing form submission with data:", testData);
-      groupService.createGroup(testData)
-        .then(resp => console.log("Success:", resp))
-        .catch(err => console.error("Error:", err));
-    };
-    
-    return () => {
-      delete window.submitGroupForm;
-    };
-  }, []);
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    });
-    
-    // Clear error for this field when user types
-    if (formErrors[name]) {
-      setFormErrors({
-        ...formErrors,
-        [name]: null
-      });
-    }
-  };
-
-  const validateForm = () => {
-    const errors = {};
-    
-    if (!formData.name.trim()) {
-      errors.name = 'Group name is required';
-    }
-    
-    if (!formData.description.trim()) {
-      errors.description = 'Description is required';
-    }
-    
-    if (!formData.targetAmount || isNaN(parseFloat(formData.targetAmount)) || parseFloat(formData.targetAmount) <= 0) {
-      errors.targetAmount = 'Please enter a valid target amount';
-    }
-    
-    if (!formData.contributionAmount || isNaN(parseFloat(formData.contributionAmount)) || parseFloat(formData.contributionAmount) <= 0) {
-      errors.contributionAmount = 'Please enter a valid contribution amount';
-    }
-    
-    if (!formData.maxMembers || isNaN(parseInt(formData.maxMembers)) || parseInt(formData.maxMembers) <= 0) {
-      errors.maxMembers = 'Please enter a valid maximum number of members';
-    }
-    
-    if (formData.goalDate) {
-      const goalDateObj = new Date(formData.goalDate);
-      const today = new Date();
-      
-      if (goalDateObj <= today) {
-        errors.goalDate = 'Goal date must be in the future';
-      }
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
+  const onSubmit = async (data) => {
     try {
       setLoading(true);
       setError(null);
-      setDebugInfo(null);
 
-      // This is the format the backend is expecting based on the API code
       const groupData = {
-        name: formData.name,
-        description: formData.description,
-        targetAmount: parseFloat(formData.targetAmount),
-        contributionAmount: parseFloat(formData.contributionAmount),
-        contributionFrequency: formData.contributionFrequency,
-        maxMembers: parseInt(formData.maxMembers),
-        isPublic: formData.isPublic
+        name: data.name,
+        description: data.description,
+        targetAmount: parseFloat(data.targetAmount),
+        contributionAmount: parseFloat(data.contributionAmount),
+        contributionFrequency: data.contributionFrequency,
+        maxMembers: parseInt(data.maxMembers, 10),
+        isPublic: data.isPublic,
       };
-      
-      // Add this console message to help users debug
-      const helpMessage = "Creating group with data: " + 
-        JSON.stringify(groupData, null, 2) + 
-        "\n\nIf this fails, try running this in your browser console:" +
-        "\n\nsubmitGroupForm()";
-        
-      console.log(helpMessage);
-      setDebugInfo(helpMessage);
-      
-      try {
-        const response = await groupService.createGroup(groupData);
-        console.log('Group created successfully:', response);
-        
-        // Handle different response formats from the server
-        const groupId = response.id || (response.group && response.group.id);
-        
-        if (groupId) {
-          navigate(`/groups/${groupId}`, { 
-            state: { 
-              message: 'Group created successfully!',
-              newGroup: true,
-              groupCreated: true
-            } 
-          });
-        } else {
-          // If we can't find the ID, go back to dashboard with groupCreated flag
-          setError("Group was created but couldn't navigate to it. Redirecting to dashboard...");
-          setTimeout(() => navigate('/dashboard', { 
-            state: { 
-              message: 'Group created successfully!',
-              groupCreated: true 
-            }
-          }), 2000);
-        }
-      } catch (apiError) {
-        console.error('API Error Response:', apiError);
-        
-        // Show more detailed error information
-        let errorDetails = apiError.response?.data || apiError.message || 'Unknown error';
-        if (typeof errorDetails === 'object') {
-          errorDetails = JSON.stringify(errorDetails, null, 2);
-        }
-        setDebugInfo(errorDetails);
-        throw apiError;
+
+      const response = await groupService.createGroup(groupData);
+      const groupId = response.id || response.group?.id;
+
+      if (groupId) {
+        navigate(`/groups/${groupId}`, { state: { message: 'Group created successfully!' } });
+      } else {
+        navigate('/groups', { state: { message: 'Group created successfully!' } });
       }
-    } catch (error) {
-      console.error('Error creating group:', error);
-      setError(`Failed to create group: ${error.message || 'Unknown error'}`);
+    } catch (err) {
+      setError(err.message || 'Failed to create group. Please try again.');
       setLoading(false);
     }
   };
@@ -188,184 +49,78 @@ const CreateGroup = () => {
   if (loading) return <Loader centered size="large" />;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Create a New Savings Group</h1>
-        <Button variant="primary" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
-      </div>
+    <div className="space-y-4">
+      <h1 className="text-xl font-bold text-gray-900 dark:text-white">Create a New Savings Group</h1>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
-          {error}
-        </div>
-      )}
+      {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
 
-      {debugInfo && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md mb-6 overflow-auto">
-          <h3 className="font-bold mb-2">Debug Information:</h3>
-          <pre className="whitespace-pre-wrap text-sm">{debugInfo}</pre>
-        </div>
-      )}
+      <Card className="p-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Basic Information</h2>
 
-      <div className="text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded-md">
-        Fields marked with <span style={{ color: 'red' }}>*</span> are required.
-      </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group Name</label>
+              <input className={inputClass} {...register('name', { required: 'Group name is required' })} />
+              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
+            </div>
 
-      <Card className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold border-b pb-2">Basic Information</h2>
-            
-            <div className="form-group">
-              <label htmlFor="name" className="form-label">
-                Group Name<RequiredField />
-              </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+              <textarea rows={3} className={inputClass} {...register('description', { required: 'Description is required' })} />
+              {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Maximum Members</label>
               <input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className={`form-input ${formErrors.name ? 'error' : ''}`}
-                required
+                type="number" min="2" max="100" className={inputClass}
+                {...register('maxMembers', { required: true, min: 2, max: 100 })}
               />
-              {formErrors.name && <div className="form-error">{formErrors.name}</div>}
+              {errors.maxMembers && <p className="mt-1 text-xs text-red-500">Must be between 2 and 100</p>}
             </div>
-            
-            <div className="form-group">
-              <label htmlFor="description" className="form-label">
-                Description<RequiredField />
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                className={`form-input h-24 ${formErrors.description ? 'error' : ''}`}
-                required
-              />
-              {formErrors.description && <div className="form-error">{formErrors.description}</div>}
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="maxMembers" className="form-label">
-                Maximum Number of Members<RequiredField />
-              </label>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input type="checkbox" className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500" {...register('isPublic')} />
+              Make this group public (anyone can join)
+            </label>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Savings Goal</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Amount (KES)</label>
               <input
-                id="maxMembers"
-                name="maxMembers"
-                type="number"
-                value={formData.maxMembers}
-                onChange={handleChange}
-                className={`form-input ${formErrors.maxMembers ? 'error' : ''}`}
-                min="2"
-                max="100"
-                required
+                type="number" min="1" step="0.01" className={inputClass}
+                {...register('targetAmount', { required: 'Target amount is required', min: { value: 1, message: 'Must be greater than 0' } })}
               />
-              {formErrors.maxMembers && <div className="form-error">{formErrors.maxMembers}</div>}
-              <p className="text-xs text-gray-500 mt-1">Minimum 2 members, maximum 100 members</p>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <input 
-                type="checkbox"
-                id="isPublic"
-                name="isPublic"
-                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                checked={formData.isPublic}
-                onChange={handleChange}
-              />
-              <label htmlFor="isPublic" className="text-sm text-gray-700">
-                Make this group public (anyone can join)
-              </label>
+              {errors.targetAmount && <p className="mt-1 text-xs text-red-500">{errors.targetAmount.message}</p>}
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold border-b pb-2">Savings Goals</h2>
-            
-            <div className="form-group">
-              <label htmlFor="targetAmount" className="form-label">
-                Target Amount (£)<RequiredField />
-              </label>
-              <input
-                id="targetAmount"
-                name="targetAmount"
-                type="number"
-                value={formData.targetAmount}
-                onChange={handleChange}
-                className={`form-input ${formErrors.targetAmount ? 'error' : ''}`}
-                min="1"
-                step="0.01"
-                required
-              />
-              {formErrors.targetAmount && <div className="form-error">{formErrors.targetAmount}</div>}
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="goalDate" className="form-label">
-                Goal Date (Optional)
-              </label>
-              <input
-                id="goalDate"
-                name="goalDate"
-                type="date"
-                value={formData.goalDate}
-                onChange={handleChange}
-                className={`form-input ${formErrors.goalDate ? 'error' : ''}`}
-              />
-              {formErrors.goalDate && <div className="form-error">{formErrors.goalDate}</div>}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold border-b pb-2">Contribution Settings</h2>
-            
-            <div className="form-group">
-              <label htmlFor="contributionFrequency" className="form-label">
-                Contribution Frequency<RequiredField />
-              </label>
-              <select
-                id="contributionFrequency"
-                name="contributionFrequency"
-                value={formData.contributionFrequency}
-                onChange={handleChange}
-                className="form-input"
-                required
-              >
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Contribution Settings</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Frequency</label>
+              <select className={inputClass} {...register('contributionFrequency')}>
                 <option value="weekly">Weekly</option>
                 <option value="biweekly">Bi-weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="custom">Custom / Flexible</option>
               </select>
             </div>
-            
-            <div className="form-group">
-              <label htmlFor="contributionAmount" className="form-label">
-                Contribution Amount (£)<RequiredField />
-              </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contribution Amount (KES)</label>
               <input
-                id="contributionAmount"
-                name="contributionAmount"
-                type="number"
-                value={formData.contributionAmount}
-                onChange={handleChange}
-                className={`form-input ${formErrors.contributionAmount ? 'error' : ''}`}
-                min="1"
-                step="0.01"
-                required
+                type="number" min="1" step="0.01" className={inputClass}
+                {...register('contributionAmount', { required: 'Contribution amount is required', min: { value: 1, message: 'Must be greater than 0' } })}
               />
-              {formErrors.contributionAmount && <div className="form-error">{formErrors.contributionAmount}</div>}
+              {errors.contributionAmount && <p className="mt-1 text-xs text-red-500">{errors.contributionAmount.message}</p>}
             </div>
           </div>
 
-          <div className="flex justify-end space-x-4 pt-4 border-t">
-            <Button 
-              type="button" 
-              variant="primary" 
-              onClick={() => navigate('/dashboard')}
-            >
-              Cancel
-            </Button>
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <Button type="button" variant="outline" onClick={() => navigate('/groups')}>Cancel</Button>
             <Button type="submit">Create Group</Button>
           </div>
         </form>

@@ -1,206 +1,139 @@
 import React, { useState, useEffect } from 'react';
+import { HiCheck } from 'react-icons/hi2';
 import { notificationService } from '../../services/notificationService';
 import { useNotifications } from '../../context/NotificationContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import '../../styles/notifications.css';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import Loader from '../../components/common/Loader';
+
+const TYPE_LABELS = {
+  contribution: 'Contribution',
+  withdrawal_request: 'Withdrawal Request',
+  withdrawal_vote: 'Vote Needed',
+  withdrawal_completed: 'Withdrawal Approved',
+  withdrawal_rejected: 'Withdrawal Rejected',
+  promoted_admin: 'Promoted to Admin',
+  cashflow: 'Cash Flow',
+};
+
+const labelFor = (type) =>
+  TYPE_LABELS[type] || type.split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 const Notifications = () => {
   const { markAsRead, markAllAsRead, fetchUnreadCount } = useNotifications();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    limit: 10,
-    offset: 0,
-    total: 0
-  });
+  const [pagination, setPagination] = useState({ limit: 10, offset: 0, total: 0 });
 
-  // Fetch notifications with pagination
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
       const response = await notificationService.getNotifications({
         limit: pagination.limit,
-        offset: pagination.offset
+        offset: pagination.offset,
       });
-      
-      setNotifications(response.data.notifications);
-      setPagination(prev => ({
-        ...prev,
-        total: response.data.meta.total
-      }));
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+      setNotifications(response.notifications || []);
+      setPagination((prev) => ({ ...prev, total: response.meta?.total || 0 }));
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initial load
   useEffect(() => {
     fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.offset, pagination.limit]);
 
-  // Handle marking a notification as read
   const handleMarkAsRead = async (notificationId) => {
     try {
       await markAsRead(notificationId);
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification.id === notificationId 
-            ? { ...notification, isRead: true } 
-            : notification
-        )
-      );
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
     }
   };
 
-  // Handle marking all notifications as read
   const handleMarkAllAsRead = async () => {
     if (notifications.length === 0) return;
-    
     try {
       await markAllAsRead();
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notification => ({ ...notification, isRead: true }))
-      );
-      
-      // Refresh unread count in the context
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       fetchUnreadCount();
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  };
-
-  // Pagination handlers
-  const handleNextPage = () => {
-    if (pagination.offset + pagination.limit < pagination.total) {
-      setPagination(prev => ({
-        ...prev,
-        offset: prev.offset + prev.limit
-      }));
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (pagination.offset > 0) {
-      setPagination(prev => ({
-        ...prev,
-        offset: Math.max(0, prev.offset - prev.limit)
-      }));
-    }
-  };
-
-  // Get notification type display class
-  const getNotificationTypeClass = (type) => {
-    switch(type) {
-      case 'contribution':
-        return 'contribution';
-      case 'withdrawal_request':
-        return 'withdrawal_request';
-      case 'withdrawal_completed':
-        return 'withdrawal_completed';
-      case 'withdrawal_rejected':
-        return 'withdrawal_rejected';
-      default:
-        return '';
-    }
-  };
-
-  // Get human-readable notification type
-  const getNotificationTypeLabel = (type) => {
-    switch(type) {
-      case 'contribution':
-        return 'Contribution';
-      case 'withdrawal_request':
-        return 'Withdrawal Request';
-      case 'withdrawal_completed':
-        return 'Withdrawal Approved';
-      case 'withdrawal_rejected':
-        return 'Withdrawal Rejected';
-      default:
-        return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
     }
   };
 
   return (
-    <div className="notifications-page">
-      <div className="notifications-page-header">
-        <h1>Notifications</h1>
-        <Button 
-          variant="primary" 
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+        <Button
+          size="sm"
+          variant="outline"
           onClick={handleMarkAllAsRead}
-          disabled={notifications.length === 0 || notifications.every(n => n.isRead)}
+          disabled={notifications.length === 0 || notifications.every((n) => n.isRead)}
         >
-          Mark all as read
+          Mark all read
         </Button>
       </div>
 
       {isLoading ? (
-        <Card>
-          <div className="notification-loading">Loading notifications...</div>
-        </Card>
+        <Loader centered size="large" />
       ) : notifications.length > 0 ? (
-        <div className="notifications-list">
-          {notifications.map(notification => (
-            <Card key={notification.id} className={`notification-card ${!notification.isRead ? 'unread' : ''}`}>
-              {!notification.isRead && <div className="notification-indicator"></div>}
-              <div className="notification-card-content">
-                <p>{notification.message}</p>
-                <div className="notification-card-meta">
-                  <span className="notification-card-time">
+        <div className="space-y-2">
+          {notifications.map((notification) => (
+            <Card
+              key={notification.id}
+              className={`p-4 flex items-start gap-3 ${!notification.isRead ? 'border-l-4 border-l-emerald-500' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-900 dark:text-white">{notification.message}</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-xs text-gray-400">
                     {formatDistanceToNow(parseISO(notification.createdAt), { addSuffix: true })}
                   </span>
-                  <span className={`notification-card-type ${getNotificationTypeClass(notification.notificationType)}`}>
-                    {getNotificationTypeLabel(notification.notificationType)}
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                    {labelFor(notification.notificationType)}
                   </span>
                 </div>
               </div>
               {!notification.isRead && (
-                <div className="notification-actions">
-                  <button 
-                    className="notification-mark-read"
-                    onClick={() => handleMarkAsRead(notification.id)}
-                    aria-label="Mark as read"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleMarkAsRead(notification.id)}
+                  className="flex-shrink-0 text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400"
+                  aria-label="Mark as read"
+                >
+                  <HiCheck className="h-5 w-5" />
+                </button>
               )}
             </Card>
           ))}
         </div>
       ) : (
-        <Card>
-          <div className="no-notifications">You don't have any notifications</div>
+        <Card className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          You don't have any notifications
         </Card>
       )}
 
-      {/* Pagination */}
       {pagination.total > pagination.limit && (
-        <div className="notification-pagination">
-          <button 
-            className="pagination-button"
-            onClick={handlePrevPage}
+        <div className="flex justify-center items-center gap-4 pt-2">
+          <button
+            className="text-sm text-emerald-600 dark:text-emerald-400 disabled:text-gray-300 dark:disabled:text-gray-600"
+            onClick={() => setPagination((p) => ({ ...p, offset: Math.max(0, p.offset - p.limit) }))}
             disabled={pagination.offset === 0}
           >
             Previous
           </button>
-          <span className="pagination-current">
-            {Math.floor(pagination.offset / pagination.limit) + 1}
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            Page {Math.floor(pagination.offset / pagination.limit) + 1}
           </span>
-          <button 
-            className="pagination-button"
-            onClick={handleNextPage}
+          <button
+            className="text-sm text-emerald-600 dark:text-emerald-400 disabled:text-gray-300 dark:disabled:text-gray-600"
+            onClick={() => setPagination((p) => ({ ...p, offset: p.offset + p.limit }))}
             disabled={pagination.offset + pagination.limit >= pagination.total}
           >
             Next
@@ -211,4 +144,4 @@ const Notifications = () => {
   );
 };
 
-export default Notifications; 
+export default Notifications;

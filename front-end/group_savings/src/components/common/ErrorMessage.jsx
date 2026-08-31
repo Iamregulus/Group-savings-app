@@ -4,32 +4,12 @@ const ErrorMessage = ({ message, onRetry }) => {
   if (!message) return null;
 
   return (
-    <div style={{ 
-      background: 'rgba(220, 53, 69, 0.1)', 
-      color: '#ff6b6b', 
-      padding: '12px', 
-      borderRadius: '5px', 
-      marginBottom: '20px',
-      border: '1px solid rgba(220, 53, 69, 0.3)',
-      fontSize: '14px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px'
-    }}>
+    <div className="flex flex-col gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400 mb-5">
       <div>{message}</div>
       {onRetry && (
-        <button 
+        <button
           onClick={onRetry}
-          style={{
-            background: 'transparent',
-            border: '1px solid #ff6b6b',
-            color: '#ff6b6b',
-            padding: '5px 10px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            alignSelf: 'flex-end',
-            fontSize: '12px'
-          }}
+          className="self-end rounded-md border border-red-400 px-2.5 py-1 text-xs text-red-400 hover:bg-red-500/10"
         >
           Retry Connection
         </button>
@@ -38,4 +18,4 @@ const ErrorMessage = ({ message, onRetry }) => {
   );
 };
 
-export default ErrorMessage; 
+export default ErrorMessage;

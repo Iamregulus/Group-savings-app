@@ -1,237 +1,91 @@
 import React, { useState } from 'react';
+import { HiOutlineLink } from 'react-icons/hi2';
 import Card from '../common/Card';
 import Button from '../common/Button';
-import Modal from '../common/Modal';
-import UserAvatar from '../dashboard/UserAvatar';
 
-const MembersList = ({ members = [], isAdmin = false, onInviteMember, onRemoveMember }) => {
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
+const MembersList = ({ members = [], isCreator = false, canPromote = false, onPromote, joinCode, groupId }) => {
+  const [promotingId, setPromotingId] = useState(null);
 
-  // Process members to ensure we have the right format
-  const processedMembers = members ? (Array.isArray(members) ? members : []) : [];
-  
-  // Filter members based on search term
-  const filteredMembers = processedMembers.filter(member => {
-    const memberName = member.firstName && member.lastName 
-      ? `${member.firstName} ${member.lastName}`
-      : member.name || '';
-    const memberEmail = member.email || '';
-    
-    return memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      memberEmail.toLowerCase().includes(searchTerm.toLowerCase());
-  });
-  
-  const handleRemoveClick = (member) => {
-    setSelectedMember(member);
-    setShowConfirmModal(true);
-  };
-  
-  const confirmRemove = () => {
-    if (selectedMember && onRemoveMember) {
-      onRemoveMember(selectedMember.id);
-      setShowConfirmModal(false);
-    }
-  };
+  const processedMembers = Array.isArray(members) ? members : [];
 
-  const handleInviteSubmit = () => {
-    if (inviteEmail && onInviteMember) {
-      onInviteMember(inviteEmail);
-      setInviteEmail('');
-      setShowInviteModal(false);
+  const handlePromote = async (userId) => {
+    if (!onPromote) return;
+    try {
+      setPromotingId(userId);
+      await onPromote(userId);
+    } finally {
+      setPromotingId(null);
     }
   };
 
   const handleCopyInviteLink = () => {
-    const inviteLink = `${window.location.origin}/invite/${window.location.pathname.split('/').pop()}`;
-    navigator.clipboard.writeText(inviteLink);
+    const link = joinCode
+      ? `${window.location.origin}/join-group?code=${joinCode}`
+      : `${window.location.origin}/groups/${groupId}`;
+    navigator.clipboard.writeText(link);
     alert('Invite link copied to clipboard!');
   };
-  
+
   return (
-    <>
-      <Card>
-        <div className="flex justify-between items-center mb-4 px-4 pt-2">
-          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{filteredMembers.length} {filteredMembers.length === 1 ? 'Member' : 'Members'}</div>
-          {isAdmin && (
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => setShowInviteModal(true)}
-            >
-              Invite
-            </Button>
-          )}
-        </div>
-        
-        {processedMembers.length > 3 && (
-          <div className="mb-4 px-4">
-            <input
-              type="text"
-              placeholder="Search members..."
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        )}
-        
-        {filteredMembers.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-            {searchTerm ? 'No members found matching your search.' : 'No members in this group yet.'}
-            {isAdmin && !searchTerm && (
-              <div className="mt-2">
-                <Button 
-                  size="sm" 
-                  onClick={() => setShowInviteModal(true)}
-                >
-                  Invite Members
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {filteredMembers.map(member => {
-              const memberName = member.firstName && member.lastName 
-                ? `${member.firstName} ${member.lastName}`
-                : member.name || 'Unknown';
-              
-              return (
-                <div key={member.id || member.userId} className="p-4 flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-800 dark:text-purple-300 font-semibold text-lg">
-                      {memberName.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{memberName}</p>
-                      {member.email && <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>}
-                      {member.role && (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          member.role === 'admin' 
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' 
-                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                        }`}>
-                          {member.role === 'admin' ? 'Admin' : 'Member'}
-                        </span>
-                      )}
-                    </div>
+    <Card className="p-4">
+      <div className="flex justify-between items-center mb-3">
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+          {processedMembers.length} {processedMembers.length === 1 ? 'Member' : 'Members'}
+        </span>
+        <button
+          onClick={handleCopyInviteLink}
+          className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+        >
+          <HiOutlineLink className="h-3.5 w-3.5" /> Invite
+        </button>
+      </div>
+
+      {processedMembers.length === 0 ? (
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">No members yet.</p>
+      ) : (
+        <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          {processedMembers.map((member) => {
+            const name = member.firstName && member.lastName
+              ? `${member.firstName} ${member.lastName}`
+              : member.name || 'Unknown';
+            const userId = member.userId || member.id;
+
+            return (
+              <div key={userId} className="py-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 flex-shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-semibold text-sm">
+                    {name.charAt(0).toUpperCase()}
                   </div>
-                  
-                  {isAdmin && member.role !== 'admin' && onRemoveMember && (
-                    <Button 
-                      variant="danger" 
-                      size="sm"
-                      onClick={() => handleRemoveClick(member)}
-                    >
-                      Remove
-                    </Button>
-                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{name}</p>
+                    {member.role && (
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                        member.role === 'admin'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                      }`}>
+                        {member.role === 'admin' ? 'Admin' : 'Member'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
 
-        {!isAdmin && processedMembers.length > 0 && (
-          <div className="px-4 py-3 bg-gray-50 text-right">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={handleCopyInviteLink}
-            >
-              Copy Invite Link
-            </Button>
-          </div>
-        )}
-      </Card>
-      
-      {/* Confirmation Modal */}
-      <Modal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        title="Confirm Removal"
-        actions={
-          <div className="flex justify-end space-x-3">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowConfirmModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="danger" 
-              onClick={confirmRemove}
-            >
-              Remove Member
-            </Button>
-          </div>
-        }
-      >
-        <p className="mb-2 text-gray-900 dark:text-gray-100">Are you sure you want to remove {selectedMember?.name || selectedMember?.firstName} from this group?</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone.</p>
-      </Modal>
-
-      {/* Invite Modal */}
-      <Modal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        title="Invite Members"
-        actions={
-          <div className="flex justify-end space-x-3">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowInviteModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleInviteSubmit}
-              disabled={!inviteEmail}
-            >
-              Send Invite
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="inviteEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="inviteEmail"
-              placeholder="member@example.com"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-            />
-          </div>
-          
-          <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Alternatively, you can share this link:</p>
-            <div className="flex">
-              <input
-                type="text"
-                className="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                value={`${window.location.origin}/invite/${window.location.pathname.split('/').pop()}`}
-                readOnly
-              />
-              <Button 
-                className="rounded-l-none"
-                onClick={handleCopyInviteLink}
-              >
-                Copy
-              </Button>
-            </div>
-          </div>
+                {isCreator && canPromote && member.role !== 'admin' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={promotingId === userId}
+                    onClick={() => handlePromote(userId)}
+                  >
+                    {promotingId === userId ? 'Promoting...' : 'Make Admin'}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </Modal>
-    </>
+      )}
+    </Card>
   );
 };
 

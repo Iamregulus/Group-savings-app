@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App.jsx';
 import './index.css'; // This will include Tailwind
-import 'bootstrap/dist/css/bootstrap.min.css'; // Ensure Bootstrap CSS is loaded
 import { Analytics } from '@vercel/analytics/react';
 import { testApiConnection, runNetworkDiagnostics } from './utils/apiTest.js';
 

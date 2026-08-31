@@ -130,7 +130,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     requestPasswordReset,
     isAuthenticated: !!currentUser,
-    isAdmin: currentUser?.role === 'admin'
+    isSuperUser: currentUser?.role === 'super_user'
   };
   
   return (

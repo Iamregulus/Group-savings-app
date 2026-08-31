@@ -27,7 +27,7 @@ const Input = ({
         value={value}
         onChange={onChange}
         className={`form-input w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-        focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 
+        focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
         bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-300
         ${error ? 'border-red-500 dark:border-red-400' : ''}`}
         placeholder={placeholder}
