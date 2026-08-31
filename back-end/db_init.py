@@ -1,5 +1,4 @@
 from app import create_app, db
-import os
 import time
 import sys
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -11,17 +10,15 @@ def init_db():
     app = create_app()
     
     with app.app_context():
-        # Print database connection info (without exposing credentials)
-        db_uri = os.environ.get('DATABASE_URI', '')
-        if db_uri:
-            db_type = 'PostgreSQL' if 'postgresql' in db_uri else 'SQLite'
-            print(f"Using {db_type} database")
-            # If PostgreSQL, print the host (but hide credentials)
-            if 'postgresql' in db_uri:
-                host_part = db_uri.split('@')[-1].split('/')[0]
-                print(f"Database host: {host_part}")
-        else:
-            print("Using default SQLite database")
+        # Print database connection info (without exposing credentials). Read
+        # this from the app's actual configured engine rather than
+        # re-deriving it from raw env vars -- that way this message can
+        # never drift from what db.create_all() below actually connects to.
+        engine_url = db.engine.url
+        db_type = 'PostgreSQL' if engine_url.drivername.startswith('postgresql') else 'SQLite'
+        print(f"Using {db_type} database")
+        if db_type == 'PostgreSQL':
+            print(f"Database host: {engine_url.host}")
         
         # Add retry logic for database connection
         retry_count = 0
